@@ -1,0 +1,591 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptiTransfer · Simulador BBVA (v2.2)</title>
+    
+    <!-- 1. Estilos (Tailwind CSS) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Librerías React y Chart.js -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 3. Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .loading { display: flex; height: 100vh; justify-content: center; align-items: center; font-family: sans-serif; color: #64748b; }
+        
+        /* Input Number Arrows Fix */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">
+            <div style="text-align: center;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: #334155;">Cargando Simulador...</h2>
+                <p style="margin-top: 10px;">Versión v2.2 (Gráficas Multi-línea & Desglose)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Handler -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const root = document.getElementById('root');
+            root.innerHTML = `
+                <div style="padding: 20px; color: #ef4444; font-family: sans-serif; max-width: 600px; margin: 0 auto; margin-top: 50px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px;">
+                    <h3 style="font-weight: bold; margin-bottom: 10px;">⚠️ Error de Ejecución</h3>
+                    <p>Algo impidió que la aplicación cargara correctamente.</p>
+                    <pre style="background: rgba(0,0,0,0.05); padding: 10px; margin-top: 10px; font-size: 0.8rem; overflow: auto;">${msg}</pre>
+                </div>
+            `;
+            return false;
+        };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        // --- UTILS ---
+        const fmtCurrency = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmtNum = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+        // --- ICONS ---
+        const Icons = {
+            TrendingUp: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>,
+            Settings: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>,
+            Table: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>,
+            Chart: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+        };
+
+        // --- LÓGICA FINANCIERA ---
+        const calculateBBVAFee = (amount) => {
+            if (amount <= 3000) return 32.0;
+            if (amount <= 10000) return 42.0;
+            if (amount <= 25000) return Math.max(amount * 0.0025, 42.0);
+            const pct = amount * 0.00125;
+            return Math.min(Math.max(pct, 62.50), 135.0);
+        };
+
+        const calculateITF = (amount, active) => active ? amount * 0.00005 : 0;
+        const calculateIR = (amount, totalAmount, totalGain, active) => {
+            if (!active || totalAmount <= 0) return 0;
+            const proportion = Math.min(1, amount / totalAmount);
+            return (totalGain * proportion) * 0.05;
+        };
+
+        const runSimulation = (purchases, transfers, params) => {
+            const sortedPurchases = [...purchases].sort((a, b) => a.week - b.week);
+            const sortedTransfers = [...transfers].sort((a, b) => a.week - b.week);
+            const weeklyRate = (params.annualRate / 100) / 52;
+            const latencyWeeks = params.latencyDays / 7.0;
+
+            let totalBBVA = 0;
+            let totalSwift = 0;
+            let totalCorr = 0;
+            let totalITF = 0;
+            let totalIR = 0;
+            let sumOpp = 0;
+            let liquidityError = false;
+
+            const pool = sortedTransfers.map(t => {
+                totalBBVA += calculateBBVAFee(t.amount);
+                totalSwift += params.swiftFee;
+                if(params.feeMode === 'OUR') totalCorr += params.correspondentFee;
+                
+                totalITF += calculateITF(t.amount, params.useITF);
+                totalIR += calculateIR(t.amount, params.totalAmount, params.totalGainForIR, params.useIR);
+                
+                return { week: t.week, amount: t.amount };
+            });
+
+            for (const p of sortedPurchases) {
+                let remainingNeed = p.amount;
+                while (remainingNeed > 0.001) {
+                    const bucketIdx = pool.findIndex(b => b.amount > 0.001);
+                    if (bucketIdx === -1) { liquidityError = true; break; }
+                    const bucket = pool[bucketIdx];
+                    if (bucket.week > p.week) { liquidityError = true; } // Llegó tarde
+                    
+                    const take = Math.min(bucket.amount, remainingNeed);
+                    
+                    // Tiempo que el dinero estuvo "parado" o viajando
+                    // Espera en origen = (Semana Compra - Semana Transferencia)
+                    // + Tiempo de viaje (latencia)
+                    const waitTime = Math.max(0, p.week - bucket.week);
+                    const totalTime = waitTime + latencyWeeks;
+                    
+                    sumOpp += take * weeklyRate * totalTime;
+                    
+                    bucket.amount -= take;
+                    remainingNeed -= take;
+                }
+            }
+
+            const totalFees = totalBBVA + totalSwift + totalCorr;
+            const totalTaxes = totalITF + totalIR;
+
+            return {
+                details: { bbva: totalBBVA, swift: totalSwift, corr: totalCorr, itf: totalITF, ir: totalIR },
+                fees: totalFees,
+                taxes: totalTaxes,
+                opportunityCost: sumOpp,
+                totalCost: totalFees + totalTaxes + sumOpp,
+                liquidityError
+            };
+        };
+
+        const generateKTransfers = (purchases, K, totalAmount) => {
+            if (purchases.length === 0 || K <= 0) return [];
+            const sortedP = [...purchases].sort((a,b) => a.week - b.week);
+            const maxW = sortedP[sortedP.length - 1].week;
+            const transfers = [];
+            
+            // Estrategia simple: dividir el tiempo en K bloques y sumar las compras de ese bloque
+            const interval = maxW / K;
+            const cuts = [];
+            for(let i=0; i<K; i++) cuts.push(Math.round(i * interval));
+            
+            cuts.forEach((cutWeek, idx) => {
+                const nextCut = idx === K - 1 ? Infinity : cuts[idx+1];
+                let sum = 0;
+                // Sumar compras que caen en este intervalo [cutWeek, nextCut)
+                sortedP.forEach(p => { 
+                    // El dinero debe estar DISPONIBLE para la compra. 
+                    // Asignamos la compra al corte anterior más cercano.
+                    if (p.week >= cutWeek && p.week < nextCut) sum += p.amount; 
+                });
+                
+                if (sum > 0) transfers.push({ id: `auto-${idx}`, week: cutWeek, amount: sum });
+            });
+            
+            // Ajuste final por decimales
+            const currSum = transfers.reduce((a,b) => a + b.amount, 0);
+            const diff = totalAmount - currSum;
+            
+            if (transfers.length > 0) {
+                 // Si falta o sobra, ajustar en la última para cerrar el monto exacto
+                 transfers[transfers.length-1].amount += diff;
+            } else if (transfers.length === 0 && totalAmount > 0) {
+                 // Fallback si K=0 o lógica falla
+                transfers.push({ id: 'fallback', week: 0, amount: totalAmount });
+            }
+            
+            // Limpiar negativos (si sobró mucho por redondeo)
+            return transfers.filter(t => t.amount > 0.01);
+        };
+
+        // --- CHART COMPONENT ---
+        const ChartComponent = ({ data, bestK }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                if (!canvasRef.current || !data) return;
+
+                const ctx = canvasRef.current.getContext('2d');
+                if (chartRef.current) chartRef.current.destroy();
+
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.k),
+                        datasets: [
+                            {
+                                label: 'Total ($)',
+                                data: data.map(d => d.total),
+                                borderColor: '#1e293b', // Slate 800
+                                backgroundColor: '#1e293b',
+                                borderWidth: 3,
+                                tension: 0.3,
+                                pointRadius: data.map(d => d.k === bestK ? 6 : 0),
+                                pointBackgroundColor: '#22c55e'
+                            },
+                            {
+                                label: 'Fees + Imp ($)',
+                                data: data.map(d => d.fees),
+                                borderColor: '#ef4444', // Red 500
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'Oportunidad ($)',
+                                data: data.map(d => d.opportunity),
+                                borderColor: '#f59e0b', // Amber 500
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                tension: 0.3,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                            tooltip: {
+                                callbacks: {
+                                    title: (ctx) => `K = ${ctx[0].label} Transferencias`,
+                                    label: (ctx) => `${ctx.dataset.label}: ${fmtCurrency(ctx.raw)}`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { grid: { color: '#f1f5f9' }, ticks: { callback: (v) => '$' + v, font: { size: 10 } } },
+                            x: { grid: { display: false }, title: { display: true, text: 'Número de Transferencias (K)', font: { size: 10 } } }
+                        }
+                    }
+                });
+
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [data, bestK]);
+
+            return <div style={{position: 'relative', width: '100%', height: '100%'}}><canvas ref={canvasRef} /></div>;
+        };
+
+        // --- UI COMPONENTS ---
+        const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>{children}</div>;
+        
+        const InputGroup = ({ label, value, onChange, type = "number", suffix, step="any" }) => (
+            <div className="flex flex-col gap-1 w-full">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
+                <div className="relative">
+                    <input 
+                        type={type} 
+                        value={value} 
+                        step={step}
+                        onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)} 
+                        className={`w-full pl-3 ${suffix ? 'pr-10' : 'pr-3'} py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors`} 
+                    />
+                    {suffix && <span className="absolute right-3 top-2 text-xs font-bold text-slate-400 pointer-events-none">{suffix}</span>}
+                </div>
+            </div>
+        );
+
+        const BreakdownRow = ({ label, value, sub = false, bold = false, color = "text-slate-600" }) => (
+            <div className={`flex justify-between items-center py-1 ${sub ? 'pl-4 text-xs' : 'text-sm'} ${bold ? 'font-bold' : ''}`}>
+                <span className={color}>{label}</span>
+                <span className={`font-mono ${color}`}>{fmtCurrency(value)}</span>
+            </div>
+        );
+
+        // --- MAIN APP ---
+        function App() {
+            const [params, setParams] = useState({ totalAmount: 100000, annualRate: 4.23, latencyDays: 1, feeMode: 'OUR', correspondentFee: 40, swiftFee: 26, useITF: true, useIR: false, totalGainForIR: 5000 });
+            const [genParams, setGenParams] = useState({ pctInit: 40, pctDCA: 30, pctRes: 30, weeksDCA: 24, weekRes: 24, kTransfers: 4 });
+            const [purchases, setPurchases] = useState([]);
+            const [transfers, setTransfers] = useState([]);
+
+            // Generar Compras
+            const generatePurchases = useCallback(() => {
+                const A = params.totalAmount;
+                const pI = genParams.pctInit / 100, pD = genParams.pctDCA / 100, pR = genParams.pctRes / 100;
+                const newPurchases = [];
+                
+                if (pI > 0) newPurchases.push({ id: 'init', week: 0, amount: A * pI });
+                
+                if (pD > 0 && genParams.weeksDCA > 0) {
+                    const amountPerWeek = (A * pD) / genParams.weeksDCA;
+                    for (let i = 1; i <= genParams.weeksDCA; i++) newPurchases.push({ id: `dca-${i}`, week: i, amount: amountPerWeek });
+                }
+                
+                if (pR > 0) newPurchases.push({ id: 'res', week: genParams.weekRes, amount: A * pR });
+                
+                setPurchases(newPurchases);
+            }, [params.totalAmount, genParams]);
+
+            // Auto-generar transferencias cuando cambian las compras o K
+            const autoGenerateTransfers = useCallback(() => {
+                const newTransfers = generateKTransfers(purchases, genParams.kTransfers, params.totalAmount);
+                setTransfers(newTransfers);
+            }, [purchases, genParams.kTransfers, params.totalAmount]);
+
+            useEffect(() => { generatePurchases(); }, []);
+            useEffect(() => { if (purchases.length > 0) autoGenerateTransfers(); }, [purchases, genParams.kTransfers]);
+
+            // Cálculos
+            const results = useMemo(() => runSimulation(purchases, transfers, params), [purchases, transfers, params]);
+            
+            // Datos para la gráfica (Curva de optimización)
+            const optimizationData = useMemo(() => {
+                if (purchases.length === 0) return [];
+                const data = [];
+                for(let k=1; k<=20; k++) {
+                    const tSim = generateKTransfers(purchases, k, params.totalAmount);
+                    const res = runSimulation(purchases, tSim, params);
+                    data.push({ k, total: res.totalCost, fees: res.fees + res.taxes, opportunity: res.opportunityCost });
+                }
+                return data;
+            }, [purchases, params]);
+
+            const bestK = useMemo(() => {
+                if (optimizationData.length === 0) return 0;
+                return optimizationData.reduce((prev, curr) => curr.total < prev.total ? curr : prev).k;
+            }, [optimizationData]);
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1600px] mx-auto">
+                    
+                    {/* Header */}
+                    <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                                <Icons.TrendingUp />
+                                OptiTransfer BBVA
+                            </h1>
+                            <p className="text-slate-500 font-medium">Simulador de Optimización de Costos de Transferencia</p>
+                        </div>
+                        <div className="bg-white px-6 py-3 rounded-xl border border-slate-200 shadow-sm flex gap-8 items-center">
+                            <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">Monto Objetivo</div>
+                                <div className="text-2xl font-mono font-bold text-slate-800">{fmtCurrency(params.totalAmount)}</div>
+                            </div>
+                            <div className="w-px h-8 bg-slate-100"></div>
+                            <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">Costo Total</div>
+                                <div className={`text-2xl font-mono font-bold ${results.liquidityError ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    {fmtCurrency(results.totalCost)}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-12 gap-6 items-start">
+                        
+                        {/* COL 1: CONFIGURACIÓN (Sidebar) */}
+                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-6">
+                            
+                            {/* Parámetros Generales */}
+                            <Card className="overflow-hidden">
+                                <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center gap-2 font-semibold text-slate-700">
+                                    <Icons.Settings /> Configuración
+                                </div>
+                                <div className="p-5 space-y-5">
+                                    <InputGroup label="Monto Total" value={params.totalAmount} suffix="$" onChange={v => setParams(p => ({...p, totalAmount: v}))} />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <InputGroup label="TIR Fondo" value={params.annualRate} suffix="%" step="0.01" onChange={v => setParams(p => ({...p, annualRate: v}))} />
+                                        <InputGroup label="Latencia" value={params.latencyDays} suffix="días" onChange={v => setParams(p => ({...p, latencyDays: v}))} />
+                                    </div>
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Modalidad Transferencia</label>
+                                        <select 
+                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500"
+                                            value={params.feeMode} 
+                                            onChange={e => setParams(p => ({...p, feeMode: e.target.value}))}
+                                        >
+                                            <option value="OUR">OUR (Remitente paga todo)</option>
+                                            <option value="SHA">SHA (Compartido)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Tarifario */}
+                            <Card className="overflow-hidden">
+                                <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center gap-2 font-semibold text-slate-700">
+                                    <span className="text-blue-500">$</span> Tarifario Bancario
+                                </div>
+                                <div className="p-5 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <InputGroup label="Swift" value={params.swiftFee} suffix="$" onChange={v => setParams(p => ({...p, swiftFee: v}))} />
+                                        <InputGroup label="Corresponsal" value={params.correspondentFee} suffix="$" onChange={v => setParams(p => ({...p, correspondentFee: v}))} />
+                                    </div>
+                                    
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                            <span className="text-xs font-medium text-slate-600">ITF (0.005%)</span>
+                                            <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={params.useITF} onChange={e => setParams(p => ({...p, useITF: e.target.checked}))} />
+                                        </div>
+                                        <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-medium text-slate-600">Imp. Renta (5%)</span>
+                                                <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={params.useIR} onChange={e => setParams(p => ({...p, useIR: e.target.checked}))} />
+                                            </div>
+                                            {params.useIR && (
+                                                <InputGroup label="Ganancia Acumulada" value={params.totalGainForIR} suffix="$" onChange={v => setParams(p => ({...p, totalGainForIR: v}))} />
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                        </div>
+
+                        {/* COL 2: GENERADOR Y TABLAS (Center) */}
+                        <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
+                            
+                            <Card>
+                                <div className="p-5 bg-slate-50/50">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Table /> Generador de Escenarios</h3>
+                                        <button onClick={() => { generatePurchases(); }} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+                                            Regenerar
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 gap-3 mb-4">
+                                        <InputGroup label="% Inicial" value={genParams.pctInit} suffix="%" onChange={v => setGenParams(p => ({...p, pctInit: v}))} />
+                                        <InputGroup label="% DCA" value={genParams.pctDCA} suffix="%" onChange={v => setGenParams(p => ({...p, pctDCA: v}))} />
+                                        <InputGroup label="% Reserva" value={genParams.pctRes} suffix="%" onChange={v => setGenParams(p => ({...p, pctRes: v}))} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <InputGroup label="Semanas DCA" value={genParams.weeksDCA} onChange={v => setGenParams(p => ({...p, weeksDCA: v}))} />
+                                        <InputGroup label="Semana Reserva" value={genParams.weekRes} onChange={v => setGenParams(p => ({...p, weekRes: v}))} />
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <div className="grid grid-cols-2 gap-4 h-[420px]">
+                                {/* Tabla Compras */}
+                                <Card className="flex flex-col overflow-hidden">
+                                    <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase flex justify-between">
+                                        <span>Calendario Compras</span>
+                                        <span className="text-slate-700">{purchases.length} eventos</span>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto">
+                                        <table className="w-full text-xs">
+                                            <thead className="bg-white sticky top-0 text-slate-400">
+                                                <tr><th className="p-2 text-left font-normal">Sem</th><th className="p-2 text-right font-normal">Monto</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {purchases.map(p => (
+                                                    <tr key={p.id}>
+                                                        <td className="p-2 text-slate-600 font-medium">Sem {p.week}</td>
+                                                        <td className="p-2 text-right font-mono text-slate-800">{fmtNum(p.amount)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </Card>
+
+                                {/* Tabla Transferencias */}
+                                <Card className="flex flex-col overflow-hidden border-blue-200 shadow-md">
+                                    <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 text-xs font-bold text-blue-700 uppercase flex justify-between items-center">
+                                        <span>Calendario Envíos</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-blue-400">K=</span>
+                                            <input 
+                                                type="number" 
+                                                className="w-10 text-center bg-white border border-blue-200 rounded px-1 py-0.5 text-blue-800 font-bold focus:outline-none"
+                                                value={genParams.kTransfers}
+                                                onChange={e => setGenParams(p => ({...p, kTransfers: parseInt(e.target.value) || 1}))}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto bg-blue-50/10">
+                                        <table className="w-full text-xs">
+                                            <thead className="bg-white sticky top-0 text-blue-300">
+                                                <tr><th className="p-2 text-left font-normal">Sem</th><th className="p-2 text-right font-normal">Monto</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-blue-50">
+                                                {transfers.map(t => (
+                                                    <tr key={t.id}>
+                                                        <td className="p-2 text-blue-900 font-medium">Sem {t.week}</td>
+                                                        <td className="p-2 text-right font-mono text-blue-700 font-bold">{fmtNum(t.amount)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="p-2 bg-blue-50 text-[10px] text-center text-blue-400 font-medium">
+                                        Se generan {transfers.length} envíos automáticamente
+                                    </div>
+                                </Card>
+                            </div>
+                        </div>
+
+                        {/* COL 3: RESULTADOS (Right) */}
+                        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                            
+                            {/* Desglose Detallado */}
+                            <Card className="p-5">
+                                <h3 className="font-bold text-slate-800 mb-4 flex justify-between items-center">
+                                    Análisis de Costos
+                                    {results.liquidityError && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded border border-red-200 uppercase tracking-wide">Error Liquidez</span>}
+                                </h3>
+
+                                <div className="space-y-4">
+                                    {/* Bloque 1: Fees */}
+                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                        <BreakdownRow label="Costos Bancarios (Fees)" value={results.fees} bold color="text-slate-800" />
+                                        <div className="mt-1 border-t border-slate-200/50 pt-1 space-y-0.5">
+                                            <BreakdownRow label="Comisiones BBVA (Var)" value={results.details.bbva} sub />
+                                            <BreakdownRow label="Swift (Fijo)" value={results.details.swift} sub />
+                                            <BreakdownRow label="Corresponsal (OUR)" value={results.details.corr} sub />
+                                        </div>
+                                    </div>
+
+                                    {/* Bloque 2: Impuestos */}
+                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                        <BreakdownRow label="Impuestos" value={results.taxes} bold color="text-slate-800" />
+                                        <div className="mt-1 border-t border-slate-200/50 pt-1 space-y-0.5">
+                                            <BreakdownRow label="ITF (0.005%)" value={results.details.itf} sub />
+                                            <BreakdownRow label="Imp. Renta (5% Ganancia)" value={results.details.ir} sub />
+                                        </div>
+                                    </div>
+
+                                    {/* Bloque 3: Oportunidad */}
+                                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                                        <BreakdownRow label="Costo de Oportunidad" value={results.opportunityCost} bold color="text-amber-800" />
+                                        <p className="text-[10px] text-amber-600/80 mt-1 pl-1">
+                                            *Interés perdido mientras el dinero espera a ser usado o viaja (latencia).
+                                        </p>
+                                    </div>
+
+                                    {/* Total */}
+                                    <div className="pt-2 border-t border-slate-200">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Costo Final</span>
+                                            <span className="text-2xl font-mono font-bold text-slate-900">{fmtCurrency(results.totalCost)}</span>
+                                        </div>
+                                        <div className="text-right text-xs text-slate-400 mt-1">
+                                            {((results.totalCost / params.totalAmount) * 100).toFixed(2)}% del capital
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Gráfica */}
+                            <Card className="h-[320px] flex flex-col p-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="font-bold text-sm text-slate-700"><Icons.Chart /> Curva de Optimización</h3>
+                                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
+                                        Óptimo Sugerido: K={bestK}
+                                    </span>
+                                </div>
+                                <div className="flex-1 relative">
+                                    <ChartComponent data={optimizationData} bestK={bestK} />
+                                </div>
+                            </Card>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
