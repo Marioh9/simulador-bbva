@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,14 +9,14 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM -->
+    <!-- React & ReactDOM (UMD para funcionar sin build steps) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Babel -->
+    <!-- Babel (para compilar JSX en el navegador) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Iconos Lucide -->
@@ -37,7 +38,8 @@
         input[type=number]::-webkit-inner-spin-button { opacity: 1; margin-left: 5px; }
         
         .tab-active { background-color: white; color: #0f172a; border-bottom: 2px solid #2563eb; font-weight: 600; }
-        .tab-inactive { color: #64748b; font-weight: 500; hover:text-slate-800; }
+        .tab-inactive { color: #64748b; font-weight: 500; cursor: pointer; }
+        .tab-inactive:hover { color: #1e293b; }
         
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -53,7 +55,7 @@
         const fmtUSD = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
         const fmtNum = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         
-        // --- ICONS (SVG inline for standalone) ---
+        // --- ICONS ---
         const Icon = ({ name, size=20, className="" }) => {
             const icons = {
                 briefcase: <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="M22 20h-4V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16H2"/><rect x="8" y="14" width="8" height="6"/>,
@@ -125,7 +127,6 @@
             const [portfolio, setPortfolio] = useState({
                 targetValue: 100000,
                 currentValue: 15000,
-                initialContribution: 10000, // Merely informational for now
                 tir: 4.23
             });
             
@@ -221,10 +222,6 @@
                 let globalError = false;
 
                 // Para el desglose, calculamos el costo de cada transferencia individualmente
-                // Y le atribuimos el costo de oportunidad de las compras que cubrió.
-                // NOTA: Reconstruimos la lógica de consumo FIFO aquí para el reporte.
-                
-                // Clonamos para consumir
                 let purchaseQueue = JSON.parse(JSON.stringify(purchases));
                 
                 const detailedTransfers = transfers.map(t => {
@@ -241,33 +238,23 @@
                     let hasLiquidityIssue = false;
 
                     // Consumir compras con este fondo
-                    // Asumimos que las transferencias están ordenadas y cubren compras en orden
-                    // Esto es una simplificación válida dado cómo generamos K cortes secuenciales
-                    
-                    // Encontramos compras que este fondo debe cubrir (las primeras en la cola)
                     while(remainingFund > 0.01 && purchaseQueue.length > 0) {
                         const p = purchaseQueue[0];
                         const take = Math.min(p.amount, remainingFund);
                         
-                        // Chequeo Liquidez Estricto: 
-                        // El dinero sale en t.week, tarda latW en llegar.
-                        // Debe llegar ANTES de p.week.
+                        // Chequeo Liquidez Estricto
                         if ((t.week + latW) > p.week) {
                             hasLiquidityIssue = true;
                             globalError = true;
                         }
 
                         // Cálculo Oportunidad
-                        // Tiempo "muerto" = (Semana Compra - Semana Salida Transferencia) + Latencia
-                        // El dinero deja de ganar interés en origen en t.week
-                        // Y se usa en p.week. Todo ese tiempo es pérdida.
                         const timeLost = Math.max(0, p.week - t.week) + latW;
                         attributedOpp += take * weeklyRate * timeLost;
 
-                        // Actualizar
                         remainingFund -= take;
                         p.amount -= take;
-                        if(p.amount < 0.01) purchaseQueue.shift(); // Compra satisfecha
+                        if(p.amount < 0.01) purchaseQueue.shift();
                     }
 
                     grandTotalFees += totalDirect;
@@ -304,36 +291,27 @@
                     
                     // Generar datos 1..15
                     const dataPoints = [];
+                    const maxW = purchases[purchases.length-1].week;
+                    
                     for(let k=1; k<=15; k++){
-                        // Mini simulación interna
-                        const maxW = purchases[purchases.length-1].week;
+                        // 1. Simular Transfers
                         const cuts = []; for(let i=0; i<k; i++) cuts.push(Math.round(i * maxW / k));
-                        // ... generación rápida de transfers ...
-                        // (Simplificado para la gráfica: reusar lógica core sería mejor refactor, 
-                        // pero aquí hacemos una approx rápida para no duplicar todo el código de arriba)
-                        // Para la demo, usaremos valores simulados coherentes o idealmente extraeríamos la lógica `runSimulation`
-                        // A efectos de este código "single-file", asumiremos que el usuario cambia K en la UI para ver el detalle.
-                        // PERO el usuario pidió ver la curva. Vamos a calcularla bien.
-                        
-                        // Lógica replicada minimalista:
                         let tList = [];
                         cuts.forEach((start, idx) => {
                             const end = (idx===k-1)?99999:cuts[idx+1];
                             const s = purchases.filter(p=>p.week>=start && p.week<end).reduce((a,b)=>a+b.amount,0);
                             if(s>0) tList.push({week:start, amount:s});
                         });
-                        if(tList.length>0 && fundingNeeded>0) {
-                             const sum=tList.reduce((a,b)=>a+b.amount,0);
-                             tList[tList.length-1].amount += (fundingNeeded-sum);
-                        }
-                        
-                        // Calc costs
+                        // Ajuste flotante simple
+                        const sT = tList.reduce((a,b)=>a+b.amount,0);
+                        if(tList.length>0 && fundingNeeded>sT) tList[tList.length-1].amount += (fundingNeeded-sT);
+
+                        // 2. Simular Costos
                         let f=0, o=0;
                         const wkRate = (portfolio.tir/100)/52;
                         const lat = strategy.latencyDays/7;
-                        
-                        // Pool simulation
                         let pQ = JSON.parse(JSON.stringify(purchases));
+                        
                         tList.forEach(t => {
                             f += calcBBVA(t.amount) + strategy.swiftFee + (strategy.feeMode==='OUR'?strategy.corrFee:0) + calcITF(t.amount, strategy.useITF);
                             let rem = t.amount;
@@ -370,7 +348,7 @@
                         }
                     });
 
-                }, [purchases, strategy, portfolio.tir]); // Recalc when purchases change
+                }, [purchases, strategy, portfolio.tir]);
 
                 return <div className="h-64 w-full"><canvas ref={canvasRef} /></div>;
             };
@@ -383,7 +361,7 @@
                 purchases.forEach(p => csv += `Compra,${p.id},${p.week},"${p.amount.toFixed(2)}",-\n`);
                 // Transferencias
                 simulation.rows.forEach((t, i) => {
-                    csv += `Transferencia,${t.id},${t.week},"${t.amount.toFixed(2)}","Fees: ${t.directCost.toFixed(2)} | Opp: ${t.oppCost.toFixed(2)}"\n`;
+                    csv += `Transferencia,${i+1},${t.week},"${t.amount.toFixed(2)}","Fees: ${t.directCost.toFixed(2)} | Opp: ${t.oppCost.toFixed(2)}"\n`;
                 });
                 
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
