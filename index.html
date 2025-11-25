@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OptiTransfer · Simulador BBVA (v2.2)</title>
+    <title>OptiTransfer · Simulador BBVA (v3.0)</title>
     
     <!-- 1. Estilos (Tailwind CSS) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,20 +20,30 @@
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
         .loading { display: flex; height: 100vh; justify-content: center; align-items: center; font-family: sans-serif; color: #64748b; }
         
         /* Input Number Arrows Fix */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { opacity: 1; }
+
+        /* Tooltip container */
+        .tooltip { position: relative; display: inline-block; cursor: help; }
+        .tooltip .tooltiptext {
+            visibility: hidden; width: 220px; background-color: #1e293b; color: #fff;
+            text-align: center; border-radius: 6px; padding: 8px; font-size: 0.75rem;
+            position: absolute; z-index: 10; bottom: 125%; left: 50%; margin-left: -110px;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none; font-weight: normal;
+        }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
     </style>
 </head>
 <body>
     <div id="root">
         <div class="loading">
             <div style="text-align: center;">
-                <h2 style="font-size: 1.5rem; font-weight: bold; color: #334155;">Cargando Simulador...</h2>
-                <p style="margin-top: 10px;">Versión v2.2 (Gráficas Multi-línea & Desglose)</p>
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: #334155;">Cargando OptiTransfer...</h2>
+                <p style="margin-top: 10px;">Versión v3.0 (Pestañas y Desglose)</p>
             </div>
         </div>
     </div>
@@ -62,10 +72,11 @@
 
         // --- ICONS ---
         const Icons = {
-            TrendingUp: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>,
-            Settings: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>,
-            Table: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>,
-            Chart: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+            Briefcase: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>,
+            Settings: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>,
+            Chart: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>,
+            Info: () => <svg className="w-4 h-4 text-blue-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>,
+            Check: () => <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
         };
 
         // --- LÓGICA FINANCIERA ---
@@ -78,11 +89,6 @@
         };
 
         const calculateITF = (amount, active) => active ? amount * 0.00005 : 0;
-        const calculateIR = (amount, totalAmount, totalGain, active) => {
-            if (!active || totalAmount <= 0) return 0;
-            const proportion = Math.min(1, amount / totalAmount);
-            return (totalGain * proportion) * 0.05;
-        };
 
         const runSimulation = (purchases, transfers, params) => {
             const sortedPurchases = [...purchases].sort((a, b) => a.week - b.week);
@@ -94,38 +100,61 @@
             let totalSwift = 0;
             let totalCorr = 0;
             let totalITF = 0;
-            let totalIR = 0;
             let sumOpp = 0;
             let liquidityError = false;
 
-            const pool = sortedTransfers.map(t => {
-                totalBBVA += calculateBBVAFee(t.amount);
-                totalSwift += params.swiftFee;
-                if(params.feeMode === 'OUR') totalCorr += params.correspondentFee;
+            // Preparamos el pool con metadatos para desglose individual
+            const pool = sortedTransfers.map((t, idx) => {
+                const bbva = calculateBBVAFee(t.amount);
+                const swift = params.swiftFee;
+                const corr = params.feeMode === 'OUR' ? params.correspondentFee : 0;
+                const itf = calculateITF(t.amount, params.useITF);
                 
-                totalITF += calculateITF(t.amount, params.useITF);
-                totalIR += calculateIR(t.amount, params.totalAmount, params.totalGainForIR, params.useIR);
-                
-                return { week: t.week, amount: t.amount };
+                totalBBVA += bbva;
+                totalSwift += swift;
+                totalCorr += corr;
+                totalITF += itf;
+
+                return { 
+                    id: t.id || idx,
+                    week: t.week, 
+                    originalAmount: t.amount,
+                    amount: t.amount, 
+                    fees: { bbva, swift, corr, itf },
+                    oppCostGenerated: 0 // Aquí acumularemos el costo de oportunidad generado por este dinero
+                };
             });
 
             for (const p of sortedPurchases) {
                 let remainingNeed = p.amount;
+                
                 while (remainingNeed > 0.001) {
+                    // FIFO: Buscar el primer dinero disponible
                     const bucketIdx = pool.findIndex(b => b.amount > 0.001);
-                    if (bucketIdx === -1) { liquidityError = true; break; }
+                    
+                    if (bucketIdx === -1) { 
+                        liquidityError = true; 
+                        break; 
+                    }
+                    
                     const bucket = pool[bucketIdx];
-                    if (bucket.week > p.week) { liquidityError = true; } // Llegó tarde
+                    
+                    // Si el dinero llega DESPUÉS de la compra, es un error de liquidez
+                    if (bucket.week > p.week) { liquidityError = true; }
                     
                     const take = Math.min(bucket.amount, remainingNeed);
                     
-                    // Tiempo que el dinero estuvo "parado" o viajando
-                    // Espera en origen = (Semana Compra - Semana Transferencia)
-                    // + Tiempo de viaje (latencia)
+                    // Cálculo de Tiempo:
+                    // Tiempo de espera (dinero parado en cuenta origen) + Latencia (dinero en el limbo)
                     const waitTime = Math.max(0, p.week - bucket.week);
                     const totalTime = waitTime + latencyWeeks;
                     
-                    sumOpp += take * weeklyRate * totalTime;
+                    const oppForThisTranche = take * weeklyRate * totalTime;
+                    
+                    sumOpp += oppForThisTranche;
+                    
+                    // Atribuimos este costo de oportunidad a la transferencia específica que proveyó los fondos
+                    bucket.oppCostGenerated += oppForThisTranche;
                     
                     bucket.amount -= take;
                     remainingNeed -= take;
@@ -133,15 +162,17 @@
             }
 
             const totalFees = totalBBVA + totalSwift + totalCorr;
-            const totalTaxes = totalITF + totalIR;
+            const totalTaxes = totalITF;
 
+            // Retornamos también el detalle por transferencia enriquecido
             return {
-                details: { bbva: totalBBVA, swift: totalSwift, corr: totalCorr, itf: totalITF, ir: totalIR },
+                details: { bbva: totalBBVA, swift: totalSwift, corr: totalCorr, itf: totalITF },
                 fees: totalFees,
                 taxes: totalTaxes,
                 opportunityCost: sumOpp,
                 totalCost: totalFees + totalTaxes + sumOpp,
-                liquidityError
+                liquidityError,
+                transferBreakdown: pool // Array enriquecido
             };
         };
 
@@ -151,7 +182,6 @@
             const maxW = sortedP[sortedP.length - 1].week;
             const transfers = [];
             
-            // Estrategia simple: dividir el tiempo en K bloques y sumar las compras de ese bloque
             const interval = maxW / K;
             const cuts = [];
             for(let i=0; i<K; i++) cuts.push(Math.round(i * interval));
@@ -159,29 +189,21 @@
             cuts.forEach((cutWeek, idx) => {
                 const nextCut = idx === K - 1 ? Infinity : cuts[idx+1];
                 let sum = 0;
-                // Sumar compras que caen en este intervalo [cutWeek, nextCut)
                 sortedP.forEach(p => { 
-                    // El dinero debe estar DISPONIBLE para la compra. 
-                    // Asignamos la compra al corte anterior más cercano.
                     if (p.week >= cutWeek && p.week < nextCut) sum += p.amount; 
                 });
-                
                 if (sum > 0) transfers.push({ id: `auto-${idx}`, week: cutWeek, amount: sum });
             });
             
-            // Ajuste final por decimales
             const currSum = transfers.reduce((a,b) => a + b.amount, 0);
             const diff = totalAmount - currSum;
             
             if (transfers.length > 0) {
-                 // Si falta o sobra, ajustar en la última para cerrar el monto exacto
                  transfers[transfers.length-1].amount += diff;
             } else if (transfers.length === 0 && totalAmount > 0) {
-                 // Fallback si K=0 o lógica falla
                 transfers.push({ id: 'fallback', week: 0, amount: totalAmount });
             }
             
-            // Limpiar negativos (si sobró mucho por redondeo)
             return transfers.filter(t => t.amount > 0.01);
         };
 
@@ -202,9 +224,9 @@
                         labels: data.map(d => d.k),
                         datasets: [
                             {
-                                label: 'Total ($)',
+                                label: 'Costo Total ($)',
                                 data: data.map(d => d.total),
-                                borderColor: '#1e293b', // Slate 800
+                                borderColor: '#1e293b',
                                 backgroundColor: '#1e293b',
                                 borderWidth: 3,
                                 tension: 0.3,
@@ -212,10 +234,9 @@
                                 pointBackgroundColor: '#22c55e'
                             },
                             {
-                                label: 'Fees + Imp ($)',
+                                label: 'Comisiones ($)',
                                 data: data.map(d => d.fees),
-                                borderColor: '#ef4444', // Red 500
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderColor: '#ef4444',
                                 borderWidth: 2,
                                 borderDash: [5, 5],
                                 tension: 0.3,
@@ -224,8 +245,7 @@
                             {
                                 label: 'Oportunidad ($)',
                                 data: data.map(d => d.opportunity),
-                                borderColor: '#f59e0b', // Amber 500
-                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                borderColor: '#f59e0b',
                                 borderWidth: 2,
                                 borderDash: [5, 5],
                                 tension: 0.3,
@@ -236,12 +256,9 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        },
+                        interaction: { mode: 'index', intersect: false },
                         plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                            legend: { position: 'bottom' },
                             tooltip: {
                                 callbacks: {
                                     title: (ctx) => `K = ${ctx[0].label} Transferencias`,
@@ -250,12 +267,11 @@
                             }
                         },
                         scales: {
-                            y: { grid: { color: '#f1f5f9' }, ticks: { callback: (v) => '$' + v, font: { size: 10 } } },
-                            x: { grid: { display: false }, title: { display: true, text: 'Número de Transferencias (K)', font: { size: 10 } } }
+                            y: { grid: { color: '#f1f5f9' }, ticks: { callback: (v) => '$' + v } },
+                            x: { grid: { display: false }, title: { display: true, text: 'Número de Transferencias (K)' } }
                         }
                     }
                 });
-
                 return () => { if (chartRef.current) chartRef.current.destroy(); };
             }, [data, bestK]);
 
@@ -265,9 +281,17 @@
         // --- UI COMPONENTS ---
         const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>{children}</div>;
         
-        const InputGroup = ({ label, value, onChange, type = "number", suffix, step="any" }) => (
+        const InputGroup = ({ label, value, onChange, type = "number", suffix, step="any", tooltip }) => (
             <div className="flex flex-col gap-1 w-full">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
+                <div className="flex items-center gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
+                    {tooltip && (
+                        <div className="tooltip">
+                            <Icons.Info />
+                            <span className="tooltiptext">{tooltip}</span>
+                        </div>
+                    )}
+                </div>
                 <div className="relative">
                     <input 
                         type={type} 
@@ -281,61 +305,93 @@
             </div>
         );
 
-        const BreakdownRow = ({ label, value, sub = false, bold = false, color = "text-slate-600" }) => (
-            <div className={`flex justify-between items-center py-1 ${sub ? 'pl-4 text-xs' : 'text-sm'} ${bold ? 'font-bold' : ''}`}>
-                <span className={color}>{label}</span>
-                <span className={`font-mono ${color}`}>{fmtCurrency(value)}</span>
-            </div>
+        const TabButton = ({ active, label, icon, onClick }) => (
+            <button 
+                onClick={onClick}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${active ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+                {icon} {label}
+            </button>
         );
 
         // --- MAIN APP ---
         function App() {
-            const [params, setParams] = useState({ totalAmount: 100000, annualRate: 4.23, latencyDays: 1, feeMode: 'OUR', correspondentFee: 40, swiftFee: 26, useITF: true, useIR: false, totalGainForIR: 5000 });
-            const [genParams, setGenParams] = useState({ pctInit: 40, pctDCA: 30, pctRes: 30, weeksDCA: 24, weekRes: 24, kTransfers: 4 });
+            const [activeTab, setActiveTab] = useState('product'); // 'product', 'strategy', 'analysis'
+            
+            // Estado del Producto
+            const [product, setProduct] = useState({
+                targetValue: 100000,
+                currentValue: 0,
+                annualRate: 4.23,
+            });
+
+            // Configuración Bancaria (Global)
+            const [config, setConfig] = useState({
+                latencyDays: 1, 
+                feeMode: 'OUR', 
+                correspondentFee: 40, 
+                swiftFee: 26, 
+                useITF: true
+            });
+
+            // Generador de Estrategia
+            const [strategy, setStrategy] = useState({
+                pctInit: 40, 
+                pctDCA: 30, 
+                pctRes: 30, 
+                weeksDCA: 26, // Default 26 semanas
+                weekRes: 26, 
+                kTransfers: 4
+            });
+
             const [purchases, setPurchases] = useState([]);
             const [transfers, setTransfers] = useState([]);
 
+            // Calcular Funding Needed
+            const fundingNeeded = Math.max(0, product.targetValue - product.currentValue);
+
             // Generar Compras
             const generatePurchases = useCallback(() => {
-                const A = params.totalAmount;
-                const pI = genParams.pctInit / 100, pD = genParams.pctDCA / 100, pR = genParams.pctRes / 100;
+                const A = fundingNeeded;
+                const pI = strategy.pctInit / 100, pD = strategy.pctDCA / 100, pR = strategy.pctRes / 100;
                 const newPurchases = [];
                 
                 if (pI > 0) newPurchases.push({ id: 'init', week: 0, amount: A * pI });
                 
-                if (pD > 0 && genParams.weeksDCA > 0) {
-                    const amountPerWeek = (A * pD) / genParams.weeksDCA;
-                    for (let i = 1; i <= genParams.weeksDCA; i++) newPurchases.push({ id: `dca-${i}`, week: i, amount: amountPerWeek });
+                if (pD > 0 && strategy.weeksDCA > 0) {
+                    const amountPerWeek = (A * pD) / strategy.weeksDCA;
+                    for (let i = 1; i <= strategy.weeksDCA; i++) newPurchases.push({ id: `dca-${i}`, week: i, amount: amountPerWeek });
                 }
                 
-                if (pR > 0) newPurchases.push({ id: 'res', week: genParams.weekRes, amount: A * pR });
+                if (pR > 0) newPurchases.push({ id: 'res', week: strategy.weekRes, amount: A * pR });
                 
                 setPurchases(newPurchases);
-            }, [params.totalAmount, genParams]);
+            }, [fundingNeeded, strategy]);
 
-            // Auto-generar transferencias cuando cambian las compras o K
+            // Auto-generar transferencias
             const autoGenerateTransfers = useCallback(() => {
-                const newTransfers = generateKTransfers(purchases, genParams.kTransfers, params.totalAmount);
+                const newTransfers = generateKTransfers(purchases, strategy.kTransfers, fundingNeeded);
                 setTransfers(newTransfers);
-            }, [purchases, genParams.kTransfers, params.totalAmount]);
+            }, [purchases, strategy.kTransfers, fundingNeeded]);
 
-            useEffect(() => { generatePurchases(); }, []);
-            useEffect(() => { if (purchases.length > 0) autoGenerateTransfers(); }, [purchases, genParams.kTransfers]);
+            useEffect(() => { generatePurchases(); }, [fundingNeeded, strategy.pctInit, strategy.pctDCA, strategy.pctRes, strategy.weeksDCA, strategy.weekRes]);
+            useEffect(() => { if (purchases.length > 0) autoGenerateTransfers(); }, [purchases, strategy.kTransfers]);
 
-            // Cálculos
+            // Cálculos principales
+            const params = { ...config, annualRate: product.annualRate };
             const results = useMemo(() => runSimulation(purchases, transfers, params), [purchases, transfers, params]);
             
-            // Datos para la gráfica (Curva de optimización)
+            // Datos para Gráfica
             const optimizationData = useMemo(() => {
                 if (purchases.length === 0) return [];
                 const data = [];
                 for(let k=1; k<=20; k++) {
-                    const tSim = generateKTransfers(purchases, k, params.totalAmount);
+                    const tSim = generateKTransfers(purchases, k, fundingNeeded);
                     const res = runSimulation(purchases, tSim, params);
                     data.push({ k, total: res.totalCost, fees: res.fees + res.taxes, opportunity: res.opportunityCost });
                 }
                 return data;
-            }, [purchases, params]);
+            }, [purchases, params, fundingNeeded]);
 
             const bestK = useMemo(() => {
                 if (optimizationData.length === 0) return 0;
@@ -343,242 +399,277 @@
             }, [optimizationData]);
 
             return (
-                <div className="min-h-screen p-4 md:p-8 max-w-[1600px] mx-auto">
+                <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto">
                     
                     {/* Header */}
                     <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                                <Icons.TrendingUp />
+                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                                <span className="bg-blue-600 text-white p-1 rounded-lg"><Icons.Chart /></span>
                                 OptiTransfer BBVA
                             </h1>
-                            <p className="text-slate-500 font-medium">Simulador de Optimización de Costos de Transferencia</p>
                         </div>
-                        <div className="bg-white px-6 py-3 rounded-xl border border-slate-200 shadow-sm flex gap-8 items-center">
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase">Monto Objetivo</div>
-                                <div className="text-2xl font-mono font-bold text-slate-800">{fmtCurrency(params.totalAmount)}</div>
-                            </div>
-                            <div className="w-px h-8 bg-slate-100"></div>
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase">Costo Total</div>
-                                <div className={`text-2xl font-mono font-bold ${results.liquidityError ? 'text-red-500' : 'text-emerald-600'}`}>
-                                    {fmtCurrency(results.totalCost)}
-                                </div>
-                            </div>
+                        <div className="flex gap-4 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                            <TabButton active={activeTab === 'product'} label="Producto" icon={<Icons.Briefcase />} onClick={() => setActiveTab('product')} />
+                            <TabButton active={activeTab === 'strategy'} label="Estrategia" icon={<Icons.Settings />} onClick={() => setActiveTab('strategy')} />
+                            <TabButton active={activeTab === 'analysis'} label="Análisis Costos" icon={<Icons.Chart />} onClick={() => setActiveTab('analysis')} />
                         </div>
                     </header>
 
-                    <div className="grid grid-cols-12 gap-6 items-start">
+                    {/* TAB CONTENT */}
+                    <div className="mt-6">
                         
-                        {/* COL 1: CONFIGURACIÓN (Sidebar) */}
-                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-6">
-                            
-                            {/* Parámetros Generales */}
-                            <Card className="overflow-hidden">
-                                <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center gap-2 font-semibold text-slate-700">
-                                    <Icons.Settings /> Configuración
-                                </div>
-                                <div className="p-5 space-y-5">
-                                    <InputGroup label="Monto Total" value={params.totalAmount} suffix="$" onChange={v => setParams(p => ({...p, totalAmount: v}))} />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <InputGroup label="TIR Fondo" value={params.annualRate} suffix="%" step="0.01" onChange={v => setParams(p => ({...p, annualRate: v}))} />
-                                        <InputGroup label="Latencia" value={params.latencyDays} suffix="días" onChange={v => setParams(p => ({...p, latencyDays: v}))} />
-                                    </div>
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Modalidad Transferencia</label>
-                                        <select 
-                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500"
-                                            value={params.feeMode} 
-                                            onChange={e => setParams(p => ({...p, feeMode: e.target.value}))}
-                                        >
-                                            <option value="OUR">OUR (Remitente paga todo)</option>
-                                            <option value="SHA">SHA (Compartido)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            {/* Tarifario */}
-                            <Card className="overflow-hidden">
-                                <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center gap-2 font-semibold text-slate-700">
-                                    <span className="text-blue-500">$</span> Tarifario Bancario
-                                </div>
-                                <div className="p-5 space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <InputGroup label="Swift" value={params.swiftFee} suffix="$" onChange={v => setParams(p => ({...p, swiftFee: v}))} />
-                                        <InputGroup label="Corresponsal" value={params.correspondentFee} suffix="$" onChange={v => setParams(p => ({...p, correspondentFee: v}))} />
-                                    </div>
-                                    
-                                    <div className="space-y-3 pt-2">
-                                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100">
-                                            <span className="text-xs font-medium text-slate-600">ITF (0.005%)</span>
-                                            <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={params.useITF} onChange={e => setParams(p => ({...p, useITF: e.target.checked}))} />
-                                        </div>
-                                        <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-medium text-slate-600">Imp. Renta (5%)</span>
-                                                <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={params.useIR} onChange={e => setParams(p => ({...p, useIR: e.target.checked}))} />
+                        {/* --- TAB 1: PRODUCTO --- */}
+                        {activeTab === 'product' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Card className="p-6">
+                                    <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Definición de Portafolio</h3>
+                                    <div className="space-y-4">
+                                        <InputGroup 
+                                            label="Valor Objetivo del Portafolio" 
+                                            value={product.targetValue} suffix="$" 
+                                            onChange={v => setProduct(p => ({...p, targetValue: v}))} 
+                                        />
+                                        <InputGroup 
+                                            label="Valor Actual (Ya Invertido)" 
+                                            value={product.currentValue} suffix="$" 
+                                            onChange={v => setProduct(p => ({...p, currentValue: v}))} 
+                                        />
+                                        <div className="pt-4 border-t border-slate-100 bg-slate-50 p-3 rounded-lg">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-sm font-bold text-slate-600">Capital Necesario a Transferir</span>
+                                                <span className="text-xl font-mono font-bold text-blue-600">{fmtCurrency(fundingNeeded)}</span>
                                             </div>
-                                            {params.useIR && (
-                                                <InputGroup label="Ganancia Acumulada" value={params.totalGainForIR} suffix="$" onChange={v => setParams(p => ({...p, totalGainForIR: v}))} />
-                                            )}
+                                            <p className="text-xs text-slate-400">Este es el monto total que se usará para la simulación.</p>
                                         </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                        </div>
-
-                        {/* COL 2: GENERADOR Y TABLAS (Center) */}
-                        <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
-                            
-                            <Card>
-                                <div className="p-5 bg-slate-50/50">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Table /> Generador de Escenarios</h3>
-                                        <button onClick={() => { generatePurchases(); }} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
-                                            Regenerar
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-3 gap-3 mb-4">
-                                        <InputGroup label="% Inicial" value={genParams.pctInit} suffix="%" onChange={v => setGenParams(p => ({...p, pctInit: v}))} />
-                                        <InputGroup label="% DCA" value={genParams.pctDCA} suffix="%" onChange={v => setGenParams(p => ({...p, pctDCA: v}))} />
-                                        <InputGroup label="% Reserva" value={genParams.pctRes} suffix="%" onChange={v => setGenParams(p => ({...p, pctRes: v}))} />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <InputGroup label="Semanas DCA" value={genParams.weeksDCA} onChange={v => setGenParams(p => ({...p, weeksDCA: v}))} />
-                                        <InputGroup label="Semana Reserva" value={genParams.weekRes} onChange={v => setGenParams(p => ({...p, weekRes: v}))} />
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <div className="grid grid-cols-2 gap-4 h-[420px]">
-                                {/* Tabla Compras */}
-                                <Card className="flex flex-col overflow-hidden">
-                                    <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase flex justify-between">
-                                        <span>Calendario Compras</span>
-                                        <span className="text-slate-700">{purchases.length} eventos</span>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto">
-                                        <table className="w-full text-xs">
-                                            <thead className="bg-white sticky top-0 text-slate-400">
-                                                <tr><th className="p-2 text-left font-normal">Sem</th><th className="p-2 text-right font-normal">Monto</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50">
-                                                {purchases.map(p => (
-                                                    <tr key={p.id}>
-                                                        <td className="p-2 text-slate-600 font-medium">Sem {p.week}</td>
-                                                        <td className="p-2 text-right font-mono text-slate-800">{fmtNum(p.amount)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
                                     </div>
                                 </Card>
 
-                                {/* Tabla Transferencias */}
-                                <Card className="flex flex-col overflow-hidden border-blue-200 shadow-md">
-                                    <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 text-xs font-bold text-blue-700 uppercase flex justify-between items-center">
-                                        <span>Calendario Envíos</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-blue-400">K=</span>
-                                            <input 
-                                                type="number" 
-                                                className="w-10 text-center bg-white border border-blue-200 rounded px-1 py-0.5 text-blue-800 font-bold focus:outline-none"
-                                                value={genParams.kTransfers}
-                                                onChange={e => setGenParams(p => ({...p, kTransfers: parseInt(e.target.value) || 1}))}
-                                            />
+                                <Card className="p-6">
+                                    <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Rentabilidad Esperada</h3>
+                                    <div className="space-y-4">
+                                        <InputGroup 
+                                            label="TIR Anual del Fondo" 
+                                            value={product.annualRate} suffix="%" step="0.01" 
+                                            tooltip="Tasa Interna de Retorno anual esperada del producto de destino. Se usa para calcular el costo de oportunidad."
+                                            onChange={v => setProduct(p => ({...p, annualRate: v}))} 
+                                        />
+                                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-sm text-amber-800">
+                                            <p><strong>¿Por qué importa?</strong><br/>
+                                            Cuanto mayor sea la TIR, más caro es tener el dinero "parado" o "viajando". El simulador intentará mover el dinero lo más tarde posible para maximizar esta rentabilidad en origen.</p>
                                         </div>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto bg-blue-50/10">
-                                        <table className="w-full text-xs">
-                                            <thead className="bg-white sticky top-0 text-blue-300">
-                                                <tr><th className="p-2 text-left font-normal">Sem</th><th className="p-2 text-right font-normal">Monto</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-blue-50">
-                                                {transfers.map(t => (
-                                                    <tr key={t.id}>
-                                                        <td className="p-2 text-blue-900 font-medium">Sem {t.week}</td>
-                                                        <td className="p-2 text-right font-mono text-blue-700 font-bold">{fmtNum(t.amount)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="p-2 bg-blue-50 text-[10px] text-center text-blue-400 font-medium">
-                                        Se generan {transfers.length} envíos automáticamente
                                     </div>
                                 </Card>
                             </div>
-                        </div>
+                        )}
 
-                        {/* COL 3: RESULTADOS (Right) */}
-                        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                            
-                            {/* Desglose Detallado */}
-                            <Card className="p-5">
-                                <h3 className="font-bold text-slate-800 mb-4 flex justify-between items-center">
-                                    Análisis de Costos
-                                    {results.liquidityError && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded border border-red-200 uppercase tracking-wide">Error Liquidez</span>}
-                                </h3>
+                        {/* --- TAB 2: ESTRATEGIA --- */}
+                        {activeTab === 'strategy' && (
+                            <div className="grid grid-cols-12 gap-6">
+                                <div className="col-span-12 lg:col-span-4 space-y-6">
+                                    {/* Generador */}
+                                    <Card className="p-5">
+                                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                            <Icons.Settings /> Generador de Escenarios
+                                        </h3>
+                                        
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <InputGroup label="% Inicial" value={strategy.pctInit} suffix="%" onChange={v => setStrategy(p => ({...p, pctInit: v}))} />
+                                                <InputGroup label="% DCA" value={strategy.pctDCA} suffix="%" onChange={v => setStrategy(p => ({...p, pctDCA: v}))} 
+                                                    tooltip="Dollar Cost Averaging: Inversión periódica para reducir volatilidad."/>
+                                                <InputGroup label="% Reserva" value={strategy.pctRes} suffix="%" onChange={v => setStrategy(p => ({...p, pctRes: v}))} 
+                                                    tooltip="Capital guardado para aprovechar caídas de mercado (dips)."/>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <InputGroup label="Semanas DCA" value={strategy.weeksDCA} onChange={v => setStrategy(p => ({...p, weeksDCA: v}))} />
+                                                <InputGroup label="Sem. Reserva" value={strategy.weekRes} onChange={v => setStrategy(p => ({...p, weekRes: v}))} 
+                                                    tooltip="Semana en la que se invierte la reserva si no hubo oportunidades antes."/>
+                                            </div>
+                                            <button onClick={generatePurchases} className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-colors">
+                                                Aplicar Distribución
+                                            </button>
+                                        </div>
+                                    </Card>
 
-                                <div className="space-y-4">
-                                    {/* Bloque 1: Fees */}
-                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                                        <BreakdownRow label="Costos Bancarios (Fees)" value={results.fees} bold color="text-slate-800" />
-                                        <div className="mt-1 border-t border-slate-200/50 pt-1 space-y-0.5">
-                                            <BreakdownRow label="Comisiones BBVA (Var)" value={results.details.bbva} sub />
-                                            <BreakdownRow label="Swift (Fijo)" value={results.details.swift} sub />
-                                            <BreakdownRow label="Corresponsal (OUR)" value={results.details.corr} sub />
+                                    {/* Configuración Bancaria */}
+                                    <Card className="p-5">
+                                        <h3 className="font-bold text-slate-800 mb-4 text-sm uppercase">Parámetros Bancarios</h3>
+                                        <div className="space-y-3">
+                                            <InputGroup 
+                                                label="Latencia (Días)" 
+                                                value={config.latencyDays} suffix="d" 
+                                                onChange={v => setConfig(p => ({...p, latencyDays: v}))} 
+                                                tooltip="Tiempo que tarda el dinero en llegar de un banco a otro. Durante este tiempo no genera intereses."
+                                            />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <InputGroup label="Swift" value={config.swiftFee} suffix="$" onChange={v => setConfig(p => ({...p, swiftFee: v}))} />
+                                                <InputGroup label="Corresponsal" value={config.correspondentFee} suffix="$" onChange={v => setConfig(p => ({...p, correspondentFee: v}))} />
+                                            </div>
+                                            <div className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100">
+                                                <span className="text-xs font-bold text-slate-500">ITF (0.005%)</span>
+                                                <input type="checkbox" checked={config.useITF} onChange={e => setConfig(p => ({...p, useITF: e.target.checked}))} />
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+
+                                <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+                                    <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <div>
+                                            <h3 className="font-bold text-slate-700">Número de Envíos (K)</h3>
+                                            <p className="text-xs text-slate-500">El sistema divide el calendario de compras en K bloques.</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-bold text-blue-600">K =</span>
+                                            <input 
+                                                type="number" 
+                                                className="w-16 text-center border-2 border-blue-100 rounded-lg py-1 font-bold text-blue-800"
+                                                value={strategy.kTransfers}
+                                                onChange={e => setStrategy(p => ({...p, kTransfers: parseInt(e.target.value) || 1}))}
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* Bloque 2: Impuestos */}
-                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                                        <BreakdownRow label="Impuestos" value={results.taxes} bold color="text-slate-800" />
-                                        <div className="mt-1 border-t border-slate-200/50 pt-1 space-y-0.5">
-                                            <BreakdownRow label="ITF (0.005%)" value={results.details.itf} sub />
-                                            <BreakdownRow label="Imp. Renta (5% Ganancia)" value={results.details.ir} sub />
-                                        </div>
-                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 flex-1 min-h-[400px]">
+                                        <Card className="flex flex-col overflow-hidden">
+                                            <div className="bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 uppercase">Calendario de Compras</div>
+                                            <div className="flex-1 overflow-y-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-white sticky top-0 text-slate-400"><tr><th className="p-2 text-left">Sem</th><th className="p-2 text-right">Monto</th></tr></thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                        {purchases.map(p => (
+                                                            <tr key={p.id}>
+                                                                <td className="p-2 font-medium text-slate-600">Sem {p.week}</td>
+                                                                <td className="p-2 text-right font-mono text-slate-800">{fmtNum(p.amount)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </Card>
 
-                                    {/* Bloque 3: Oportunidad */}
-                                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                                        <BreakdownRow label="Costo de Oportunidad" value={results.opportunityCost} bold color="text-amber-800" />
-                                        <p className="text-[10px] text-amber-600/80 mt-1 pl-1">
-                                            *Interés perdido mientras el dinero espera a ser usado o viaja (latencia).
+                                        <Card className="flex flex-col overflow-hidden border-blue-200">
+                                            <div className="bg-blue-50 px-4 py-2 text-xs font-bold text-blue-600 uppercase">Calendario de Transferencias</div>
+                                            <div className="flex-1 overflow-y-auto bg-blue-50/10">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-white sticky top-0 text-blue-300"><tr><th className="p-2 text-left">Sem</th><th className="p-2 text-right">Monto</th></tr></thead>
+                                                    <tbody className="divide-y divide-blue-50">
+                                                        {transfers.map(t => (
+                                                            <tr key={t.id}>
+                                                                <td className="p-2 font-medium text-blue-800">Sem {t.week}</td>
+                                                                <td className="p-2 text-right font-mono font-bold text-blue-600">{fmtNum(t.amount)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- TAB 3: ANÁLISIS --- */}
+                        {activeTab === 'analysis' && (
+                            <div className="grid grid-cols-12 gap-6">
+                                {/* Left: Chart & Summary */}
+                                <div className="col-span-12 lg:col-span-5 space-y-6">
+                                    <Card className="p-5">
+                                        <h3 className="font-bold text-slate-800 mb-2">Resumen de Costos</h3>
+                                        <div className="text-3xl font-mono font-bold text-slate-900 mb-1">{fmtCurrency(results.totalCost)}</div>
+                                        <p className="text-sm text-slate-500 mb-4">
+                                            Total estimado para <strong>{strategy.kTransfers} envíos</strong> ({((results.totalCost / fundingNeeded) * 100).toFixed(2)}% del capital)
                                         </p>
-                                    </div>
+                                        
+                                        {results.liquidityError && (
+                                            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-200 mb-4 flex gap-2">
+                                                <span>⚠️</span>
+                                                <div><strong>Error de Liquidez:</strong> El dinero llega tarde para algunas compras. Aumenta K o mueve las transferencias antes.</div>
+                                            </div>
+                                        )}
 
-                                    {/* Total */}
-                                    <div className="pt-2 border-t border-slate-200">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Costo Final</span>
-                                            <span className="text-2xl font-mono font-bold text-slate-900">{fmtCurrency(results.totalCost)}</span>
+                                        <div className="space-y-2 text-sm border-t pt-4">
+                                            <div className="flex justify-between">
+                                                <span className="text-slate-600">Comisiones Bancarias</span>
+                                                <span className="font-bold text-slate-800">{fmtCurrency(results.fees)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-slate-600">Impuestos (ITF)</span>
+                                                <span className="font-bold text-slate-800">{fmtCurrency(results.taxes)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-amber-600">Costo Oportunidad</span>
+                                                <span className="font-bold text-amber-700">{fmtCurrency(results.opportunityCost)}</span>
+                                            </div>
                                         </div>
-                                        <div className="text-right text-xs text-slate-400 mt-1">
-                                            {((results.totalCost / params.totalAmount) * 100).toFixed(2)}% del capital
+                                    </Card>
+
+                                    <Card className="h-[300px] p-4 flex flex-col">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h3 className="font-bold text-xs text-slate-500 uppercase tracking-wider">Curva de Optimización</h3>
+                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Óptimo: K={bestK}</span>
                                         </div>
-                                    </div>
+                                        <div className="flex-1 relative">
+                                            <ChartComponent data={optimizationData} bestK={bestK} />
+                                        </div>
+                                    </Card>
                                 </div>
-                            </Card>
 
-                            {/* Gráfica */}
-                            <Card className="h-[320px] flex flex-col p-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-bold text-sm text-slate-700"><Icons.Chart /> Curva de Optimización</h3>
-                                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
-                                        Óptimo Sugerido: K={bestK}
-                                    </span>
+                                {/* Right: Detailed Breakdown Table */}
+                                <div className="col-span-12 lg:col-span-7">
+                                    <Card className="h-full flex flex-col overflow-hidden">
+                                        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
+                                            <h3 className="font-bold text-slate-700">Desglose Detallado por Operación</h3>
+                                            <p className="text-xs text-slate-400">Costos atribuidos a cada transferencia individual.</p>
+                                        </div>
+                                        <div className="flex-1 overflow-auto">
+                                            <table className="w-full text-xs text-right">
+                                                <thead className="bg-white text-slate-500 font-medium sticky top-0 shadow-sm">
+                                                    <tr>
+                                                        <th className="p-3 text-left">#</th>
+                                                        <th className="p-3">Semana</th>
+                                                        <th className="p-3">Monto</th>
+                                                        <th className="p-3 text-red-500">BBVA</th>
+                                                        <th className="p-3 text-red-500">Swift+Corr</th>
+                                                        <th className="p-3 text-red-500">ITF</th>
+                                                        <th className="p-3 text-amber-600">Oportunidad</th>
+                                                        <th className="p-3 font-bold text-slate-800">Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {results.transferBreakdown.map((t, idx) => {
+                                                        const rowTotal = t.fees.bbva + t.fees.swift + t.fees.corr + t.fees.itf + t.oppCostGenerated;
+                                                        return (
+                                                            <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                                                                <td className="p-3 text-left font-bold text-slate-400">{idx + 1}</td>
+                                                                <td className="p-3 text-slate-600">Sem {t.week}</td>
+                                                                <td className="p-3 font-mono font-bold text-blue-700">{fmtNum(t.originalAmount)}</td>
+                                                                <td className="p-3 text-slate-600">{fmtNum(t.fees.bbva)}</td>
+                                                                <td className="p-3 text-slate-600">{fmtNum(t.fees.swift + t.fees.corr)}</td>
+                                                                <td className="p-3 text-slate-600">{fmtNum(t.fees.itf)}</td>
+                                                                <td className="p-3 text-amber-600 font-medium">{fmtNum(t.oppCostGenerated)}</td>
+                                                                <td className="p-3 font-bold text-slate-900 bg-slate-50/50">{fmtNum(rowTotal)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                                <tfoot className="bg-slate-50 font-bold text-slate-800">
+                                                    <tr>
+                                                        <td colSpan="3" className="p-3 text-left uppercase text-xs tracking-wider">Totales</td>
+                                                        <td className="p-3">{fmtNum(results.details.bbva)}</td>
+                                                        <td className="p-3">{fmtNum(results.details.swift + results.details.corr)}</td>
+                                                        <td className="p-3">{fmtNum(results.details.itf)}</td>
+                                                        <td className="p-3 text-amber-700">{fmtNum(results.opportunityCost)}</td>
+                                                        <td className="p-3">{fmtNum(results.totalCost)}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </Card>
                                 </div>
-                                <div className="flex-1 relative">
-                                    <ChartComponent data={optimizationData} bestK={bestK} />
-                                </div>
-                            </Card>
-
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -589,3 +680,4 @@
     </script>
 </body>
 </html>
+  
