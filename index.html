@@ -4,582 +4,617 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OptiTransfer · Simulador BBVA (v2.2)</title>
+    <title>OptiTransfer Pro · v3.0</title>
     
-    <!-- 1. Estilos (Tailwind CSS) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. Librerías React y Chart.js -->
+    <!-- React & ReactDOM (UMD para funcionar sin build steps) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- 3. Babel -->
+    <!-- Babel (para compilar JSX en el navegador) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
+    <!-- Iconos Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        .loading { display: flex; height: 100vh; justify-content: center; align-items: center; font-family: sans-serif; color: #64748b; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
         
-        /* Input Number Arrows Fix */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { opacity: 1; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Input adjustments */
+        input[type=number]::-webkit-inner-spin-button { opacity: 1; margin-left: 5px; }
+        
+        .tab-active { background-color: white; color: #0f172a; border-bottom: 2px solid #2563eb; font-weight: 600; }
+        .tab-inactive { color: #64748b; font-weight: 500; cursor: pointer; }
+        .tab-inactive:hover { color: #1e293b; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-    <div id="root">
-        <div class="loading">
-            <div style="text-align: center;">
-                <h2 style="font-size: 1.5rem; font-weight: bold; color: #334155;">Cargando Simulador...</h2>
-                <p style="margin-top: 10px;">Versión v2.2 (Gráficas Multi-línea & Desglose)</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Error Handler -->
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            const root = document.getElementById('root');
-            root.innerHTML = `
-                <div style="padding: 20px; color: #ef4444; font-family: sans-serif; max-width: 600px; margin: 0 auto; margin-top: 50px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px;">
-                    <h3 style="font-weight: bold; margin-bottom: 10px;">⚠️ Error de Ejecución</h3>
-                    <p>Algo impidió que la aplicación cargara correctamente.</p>
-                    <pre style="background: rgba(0,0,0,0.05); padding: 10px; margin-top: 10px; font-size: 0.8rem; overflow: auto;">${msg}</pre>
-                </div>
-            `;
-            return false;
-        };
-    </script>
+    <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
         // --- UTILS ---
-        const fmtCurrency = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmtUSD = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
         const fmtNum = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-
-        // --- ICONS ---
-        const Icons = {
-            TrendingUp: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>,
-            Settings: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>,
-            Table: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>,
-            Chart: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-        };
-
-        // --- LÓGICA FINANCIERA ---
-        const calculateBBVAFee = (amount) => {
-            if (amount <= 3000) return 32.0;
-            if (amount <= 10000) return 42.0;
-            if (amount <= 25000) return Math.max(amount * 0.0025, 42.0);
-            const pct = amount * 0.00125;
-            return Math.min(Math.max(pct, 62.50), 135.0);
-        };
-
-        const calculateITF = (amount, active) => active ? amount * 0.00005 : 0;
-        const calculateIR = (amount, totalAmount, totalGain, active) => {
-            if (!active || totalAmount <= 0) return 0;
-            const proportion = Math.min(1, amount / totalAmount);
-            return (totalGain * proportion) * 0.05;
-        };
-
-        const runSimulation = (purchases, transfers, params) => {
-            const sortedPurchases = [...purchases].sort((a, b) => a.week - b.week);
-            const sortedTransfers = [...transfers].sort((a, b) => a.week - b.week);
-            const weeklyRate = (params.annualRate / 100) / 52;
-            const latencyWeeks = params.latencyDays / 7.0;
-
-            let totalBBVA = 0;
-            let totalSwift = 0;
-            let totalCorr = 0;
-            let totalITF = 0;
-            let totalIR = 0;
-            let sumOpp = 0;
-            let liquidityError = false;
-
-            const pool = sortedTransfers.map(t => {
-                totalBBVA += calculateBBVAFee(t.amount);
-                totalSwift += params.swiftFee;
-                if(params.feeMode === 'OUR') totalCorr += params.correspondentFee;
-                
-                totalITF += calculateITF(t.amount, params.useITF);
-                totalIR += calculateIR(t.amount, params.totalAmount, params.totalGainForIR, params.useIR);
-                
-                return { week: t.week, amount: t.amount };
-            });
-
-            for (const p of sortedPurchases) {
-                let remainingNeed = p.amount;
-                while (remainingNeed > 0.001) {
-                    const bucketIdx = pool.findIndex(b => b.amount > 0.001);
-                    if (bucketIdx === -1) { liquidityError = true; break; }
-                    const bucket = pool[bucketIdx];
-                    if (bucket.week > p.week) { liquidityError = true; } // Llegó tarde
-                    
-                    const take = Math.min(bucket.amount, remainingNeed);
-                    
-                    // Tiempo que el dinero estuvo "parado" o viajando
-                    // Espera en origen = (Semana Compra - Semana Transferencia)
-                    // + Tiempo de viaje (latencia)
-                    const waitTime = Math.max(0, p.week - bucket.week);
-                    const totalTime = waitTime + latencyWeeks;
-                    
-                    sumOpp += take * weeklyRate * totalTime;
-                    
-                    bucket.amount -= take;
-                    remainingNeed -= take;
-                }
-            }
-
-            const totalFees = totalBBVA + totalSwift + totalCorr;
-            const totalTaxes = totalITF + totalIR;
-
-            return {
-                details: { bbva: totalBBVA, swift: totalSwift, corr: totalCorr, itf: totalITF, ir: totalIR },
-                fees: totalFees,
-                taxes: totalTaxes,
-                opportunityCost: sumOpp,
-                totalCost: totalFees + totalTaxes + sumOpp,
-                liquidityError
-            };
-        };
-
-        const generateKTransfers = (purchases, K, totalAmount) => {
-            if (purchases.length === 0 || K <= 0) return [];
-            const sortedP = [...purchases].sort((a,b) => a.week - b.week);
-            const maxW = sortedP[sortedP.length - 1].week;
-            const transfers = [];
-            
-            // Estrategia simple: dividir el tiempo en K bloques y sumar las compras de ese bloque
-            const interval = maxW / K;
-            const cuts = [];
-            for(let i=0; i<K; i++) cuts.push(Math.round(i * interval));
-            
-            cuts.forEach((cutWeek, idx) => {
-                const nextCut = idx === K - 1 ? Infinity : cuts[idx+1];
-                let sum = 0;
-                // Sumar compras que caen en este intervalo [cutWeek, nextCut)
-                sortedP.forEach(p => { 
-                    // El dinero debe estar DISPONIBLE para la compra. 
-                    // Asignamos la compra al corte anterior más cercano.
-                    if (p.week >= cutWeek && p.week < nextCut) sum += p.amount; 
-                });
-                
-                if (sum > 0) transfers.push({ id: `auto-${idx}`, week: cutWeek, amount: sum });
-            });
-            
-            // Ajuste final por decimales
-            const currSum = transfers.reduce((a,b) => a + b.amount, 0);
-            const diff = totalAmount - currSum;
-            
-            if (transfers.length > 0) {
-                 // Si falta o sobra, ajustar en la última para cerrar el monto exacto
-                 transfers[transfers.length-1].amount += diff;
-            } else if (transfers.length === 0 && totalAmount > 0) {
-                 // Fallback si K=0 o lógica falla
-                transfers.push({ id: 'fallback', week: 0, amount: totalAmount });
-            }
-            
-            // Limpiar negativos (si sobró mucho por redondeo)
-            return transfers.filter(t => t.amount > 0.01);
-        };
-
-        // --- CHART COMPONENT ---
-        const ChartComponent = ({ data, bestK }) => {
-            const canvasRef = useRef(null);
-            const chartRef = useRef(null);
-
-            useEffect(() => {
-                if (!canvasRef.current || !data) return;
-
-                const ctx = canvasRef.current.getContext('2d');
-                if (chartRef.current) chartRef.current.destroy();
-
-                chartRef.current = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.map(d => d.k),
-                        datasets: [
-                            {
-                                label: 'Total ($)',
-                                data: data.map(d => d.total),
-                                borderColor: '#1e293b', // Slate 800
-                                backgroundColor: '#1e293b',
-                                borderWidth: 3,
-                                tension: 0.3,
-                                pointRadius: data.map(d => d.k === bestK ? 6 : 0),
-                                pointBackgroundColor: '#22c55e'
-                            },
-                            {
-                                label: 'Fees + Imp ($)',
-                                data: data.map(d => d.fees),
-                                borderColor: '#ef4444', // Red 500
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                borderWidth: 2,
-                                borderDash: [5, 5],
-                                tension: 0.3,
-                                pointRadius: 0
-                            },
-                            {
-                                label: 'Oportunidad ($)',
-                                data: data.map(d => d.opportunity),
-                                borderColor: '#f59e0b', // Amber 500
-                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                                borderWidth: 2,
-                                borderDash: [5, 5],
-                                tension: 0.3,
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        },
-                        plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
-                            tooltip: {
-                                callbacks: {
-                                    title: (ctx) => `K = ${ctx[0].label} Transferencias`,
-                                    label: (ctx) => `${ctx.dataset.label}: ${fmtCurrency(ctx.raw)}`
-                                }
-                            }
-                        },
-                        scales: {
-                            y: { grid: { color: '#f1f5f9' }, ticks: { callback: (v) => '$' + v, font: { size: 10 } } },
-                            x: { grid: { display: false }, title: { display: true, text: 'Número de Transferencias (K)', font: { size: 10 } } }
-                        }
-                    }
-                });
-
-                return () => { if (chartRef.current) chartRef.current.destroy(); };
-            }, [data, bestK]);
-
-            return <div style={{position: 'relative', width: '100%', height: '100%'}}><canvas ref={canvasRef} /></div>;
-        };
-
-        // --- UI COMPONENTS ---
-        const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>{children}</div>;
         
-        const InputGroup = ({ label, value, onChange, type = "number", suffix, step="any" }) => (
-            <div className="flex flex-col gap-1 w-full">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
-                <div className="relative">
+        // --- ICONS ---
+        const Icon = ({ name, size=20, className="" }) => {
+            const icons = {
+                briefcase: <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="M22 20h-4V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16H2"/><rect x="8" y="14" width="8" height="6"/>,
+                settings: <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>,
+                chart: <path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>,
+                info: <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>,
+                download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>,
+                alert: <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            };
+            return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || icons.info}</svg>;
+        };
+
+        // --- COMPONENTS ---
+        const Card = ({ children, title, icon, className = "" }) => (
+            <div className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden ${className}`}>
+                {title && (
+                    <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2 font-semibold text-slate-800">
+                        {icon && <Icon name={icon} size={18} className="text-blue-500" />}
+                        {title}
+                    </div>
+                )}
+                <div className="p-5">{children}</div>
+            </div>
+        );
+
+        const InputField = ({ label, value, onChange, suffix, type="number", step="any", help }) => (
+            <div className="flex flex-col gap-1.5 w-full">
+                <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</label>
+                </div>
+                <div className="relative group">
                     <input 
                         type={type} 
                         value={value} 
                         step={step}
                         onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)} 
-                        className={`w-full pl-3 ${suffix ? 'pr-10' : 'pr-3'} py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors`} 
+                        className="w-full pl-3 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 shadow-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all" 
                     />
-                    {suffix && <span className="absolute right-3 top-2 text-xs font-bold text-slate-400 pointer-events-none">{suffix}</span>}
+                    {suffix && <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400 pointer-events-none bg-white pl-1">{suffix}</span>}
                 </div>
+                {help && <p className="text-[10px] text-slate-400 leading-tight">{help}</p>}
             </div>
         );
 
-        const BreakdownRow = ({ label, value, sub = false, bold = false, color = "text-slate-600" }) => (
-            <div className={`flex justify-between items-center py-1 ${sub ? 'pl-4 text-xs' : 'text-sm'} ${bold ? 'font-bold' : ''}`}>
-                <span className={color}>{label}</span>
-                <span className={`font-mono ${color}`}>{fmtCurrency(value)}</span>
+        const ExplanationBox = ({ title, children }) => (
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                <h4 className="text-blue-800 font-bold text-xs mb-1 flex items-center gap-1">
+                    <Icon name="info" size={12} /> {title}
+                </h4>
+                <p className="text-blue-700/80 text-xs leading-relaxed">{children}</p>
             </div>
         );
+
+        // --- FINANCIAL LOGIC ---
+        const calcBBVA = (m) => {
+            if (m <= 3000) return 32.0;
+            if (m <= 10000) return 42.0;
+            if (m <= 25000) return Math.max(m * 0.0025, 42.0);
+            return Math.min(Math.max(m * 0.00125, 62.5), 135.0);
+        };
+        const calcITF = (m, active) => active ? m * 0.00005 : 0;
 
         // --- MAIN APP ---
         function App() {
-            const [params, setParams] = useState({ totalAmount: 100000, annualRate: 4.23, latencyDays: 1, feeMode: 'OUR', correspondentFee: 40, swiftFee: 26, useITF: true, useIR: false, totalGainForIR: 5000 });
-            const [genParams, setGenParams] = useState({ pctInit: 40, pctDCA: 30, pctRes: 30, weeksDCA: 24, weekRes: 24, kTransfers: 4 });
+            // STATE: Pestañas
+            const [activeTab, setActiveTab] = useState('product'); // product, strategy, analysis
+
+            // STATE: Producto (Cartera)
+            const [portfolio, setPortfolio] = useState({
+                targetValue: 100000,
+                currentValue: 15000,
+                tir: 4.23
+            });
+            
+            // STATE: Estrategia (Generador y Tarifas)
+            const [strategy, setStrategy] = useState({
+                feeMode: 'OUR', // OUR vs SHA
+                swiftFee: 26,
+                corrFee: 40,
+                latencyDays: 2,
+                useITF: true,
+                
+                // Generador
+                pctInit: 40,
+                pctDCA: 30,
+                pctRes: 30,
+                weeksDCA: 26,
+                weekRes: 26
+            });
+
+            // STATE: Análisis
+            const [analysisK, setAnalysisK] = useState(4);
+            
+            // STATE: Computados
+            const [fundingNeeded, setFundingNeeded] = useState(0);
             const [purchases, setPurchases] = useState([]);
             const [transfers, setTransfers] = useState([]);
 
-            // Generar Compras
-            const generatePurchases = useCallback(() => {
-                const A = params.totalAmount;
-                const pI = genParams.pctInit / 100, pD = genParams.pctDCA / 100, pR = genParams.pctRes / 100;
-                const newPurchases = [];
+            // 1. Calcular Funding
+            useEffect(() => {
+                const needed = Math.max(0, portfolio.targetValue - portfolio.currentValue);
+                setFundingNeeded(needed);
+            }, [portfolio.targetValue, portfolio.currentValue]);
+
+            // 2. Generar Compras (Cuando cambia Funding o Estrategia)
+            useEffect(() => {
+                if(fundingNeeded <= 0) { setPurchases([]); return; }
                 
-                if (pI > 0) newPurchases.push({ id: 'init', week: 0, amount: A * pI });
+                const A = fundingNeeded;
+                const { pctInit, pctDCA, pctRes, weeksDCA, weekRes } = strategy;
+                const list = [];
                 
-                if (pD > 0 && genParams.weeksDCA > 0) {
-                    const amountPerWeek = (A * pD) / genParams.weeksDCA;
-                    for (let i = 1; i <= genParams.weeksDCA; i++) newPurchases.push({ id: `dca-${i}`, week: i, amount: amountPerWeek });
+                // Inicial (Semana 0)
+                if(pctInit > 0) list.push({ id: 'init', week: 0, amount: A * (pctInit/100) });
+                
+                // DCA (Semanas 1 a weeksDCA)
+                if(pctDCA > 0 && weeksDCA > 0) {
+                    const amt = (A * (pctDCA/100)) / weeksDCA;
+                    for(let w=1; w<=weeksDCA; w++) list.push({ id: `dca-${w}`, week: w, amount: amt });
                 }
                 
-                if (pR > 0) newPurchases.push({ id: 'res', week: genParams.weekRes, amount: A * pR });
+                // Reserva (Semana weekRes)
+                if(pctRes > 0) list.push({ id: 'res', week: weekRes, amount: A * (pctRes/100) });
                 
-                setPurchases(newPurchases);
-            }, [params.totalAmount, genParams]);
+                setPurchases(list.sort((a,b) => a.week - b.week));
+            }, [fundingNeeded, strategy]);
 
-            // Auto-generar transferencias cuando cambian las compras o K
-            const autoGenerateTransfers = useCallback(() => {
-                const newTransfers = generateKTransfers(purchases, genParams.kTransfers, params.totalAmount);
-                setTransfers(newTransfers);
-            }, [purchases, genParams.kTransfers, params.totalAmount]);
+            // 3. Generar Transferencias (K envíos)
+            useEffect(() => {
+                if(purchases.length === 0 || analysisK <= 0) { setTransfers([]); return; }
+                
+                const maxW = purchases[purchases.length-1].week;
+                const cuts = [];
+                // Estrategia: Dividir horizonte temporal en K partes iguales
+                for(let i=0; i<analysisK; i++) cuts.push(Math.round(i * maxW / analysisK));
+                
+                const list = [];
+                cuts.forEach((startWeek, i) => {
+                    const endWeek = (i === analysisK - 1) ? 99999 : cuts[i+1];
+                    // Sumar compras que caen en este intervalo
+                    // Regla: La transferencia sale en startWeek y cubre compras >= startWeek
+                    const sum = purchases.filter(p => p.week >= startWeek && p.week < endWeek)
+                                         .reduce((acc, p) => acc + p.amount, 0);
+                    if(sum > 0) list.push({ id: `t-${i}`, week: startWeek, amount: sum });
+                });
 
-            useEffect(() => { generatePurchases(); }, []);
-            useEffect(() => { if (purchases.length > 0) autoGenerateTransfers(); }, [purchases, genParams.kTransfers]);
+                // Ajuste de precisión
+                const totalT = list.reduce((a,b)=>a+b.amount,0);
+                const diff = fundingNeeded - totalT;
+                if(list.length > 0 && Math.abs(diff) > 0.01) list[list.length-1].amount += diff;
 
-            // Cálculos
-            const results = useMemo(() => runSimulation(purchases, transfers, params), [purchases, transfers, params]);
-            
-            // Datos para la gráfica (Curva de optimización)
-            const optimizationData = useMemo(() => {
-                if (purchases.length === 0) return [];
-                const data = [];
-                for(let k=1; k<=20; k++) {
-                    const tSim = generateKTransfers(purchases, k, params.totalAmount);
-                    const res = runSimulation(purchases, tSim, params);
-                    data.push({ k, total: res.totalCost, fees: res.fees + res.taxes, opportunity: res.opportunityCost });
-                }
-                return data;
-            }, [purchases, params]);
+                setTransfers(list);
+            }, [purchases, analysisK, fundingNeeded]);
 
-            const bestK = useMemo(() => {
-                if (optimizationData.length === 0) return 0;
-                return optimizationData.reduce((prev, curr) => curr.total < prev.total ? curr : prev).k;
-            }, [optimizationData]);
+            // 4. MOTOR DE CÁLCULO (Simulación Detallada)
+            const simulation = useMemo(() => {
+                if(transfers.length === 0) return null;
+                
+                const weeklyRate = (portfolio.tir / 100) / 52;
+                const latW = strategy.latencyDays / 7.0;
+                
+                let grandTotalFees = 0;
+                let grandTotalOpp = 0;
+                let globalError = false;
 
-            return (
-                <div className="min-h-screen p-4 md:p-8 max-w-[1600px] mx-auto">
+                // Para el desglose, calculamos el costo de cada transferencia individualmente
+                let purchaseQueue = JSON.parse(JSON.stringify(purchases));
+                
+                const detailedTransfers = transfers.map(t => {
+                    // Costos Directos
+                    const bbva = calcBBVA(t.amount);
+                    const itf = calcITF(t.amount, strategy.useITF);
+                    const swift = strategy.swiftFee;
+                    const corr = (strategy.feeMode === 'OUR') ? strategy.corrFee : 0;
+                    const totalDirect = bbva + itf + swift + corr;
                     
-                    {/* Header */}
-                    <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                                <Icons.TrendingUp />
-                                OptiTransfer BBVA
-                            </h1>
-                            <p className="text-slate-500 font-medium">Simulador de Optimización de Costos de Transferencia</p>
-                        </div>
-                        <div className="bg-white px-6 py-3 rounded-xl border border-slate-200 shadow-sm flex gap-8 items-center">
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase">Monto Objetivo</div>
-                                <div className="text-2xl font-mono font-bold text-slate-800">{fmtCurrency(params.totalAmount)}</div>
-                            </div>
-                            <div className="w-px h-8 bg-slate-100"></div>
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase">Costo Total</div>
-                                <div className={`text-2xl font-mono font-bold ${results.liquidityError ? 'text-red-500' : 'text-emerald-600'}`}>
-                                    {fmtCurrency(results.totalCost)}
-                                </div>
-                            </div>
-                        </div>
-                    </header>
+                    // Costos Oportunidad (Atribución)
+                    let attributedOpp = 0;
+                    let remainingFund = t.amount;
+                    let hasLiquidityIssue = false;
 
-                    <div className="grid grid-cols-12 gap-6 items-start">
+                    // Consumir compras con este fondo
+                    while(remainingFund > 0.01 && purchaseQueue.length > 0) {
+                        const p = purchaseQueue[0];
+                        const take = Math.min(p.amount, remainingFund);
                         
-                        {/* COL 1: CONFIGURACIÓN (Sidebar) */}
-                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-6">
-                            
-                            {/* Parámetros Generales */}
-                            <Card className="overflow-hidden">
-                                <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center gap-2 font-semibold text-slate-700">
-                                    <Icons.Settings /> Configuración
-                                </div>
-                                <div className="p-5 space-y-5">
-                                    <InputGroup label="Monto Total" value={params.totalAmount} suffix="$" onChange={v => setParams(p => ({...p, totalAmount: v}))} />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <InputGroup label="TIR Fondo" value={params.annualRate} suffix="%" step="0.01" onChange={v => setParams(p => ({...p, annualRate: v}))} />
-                                        <InputGroup label="Latencia" value={params.latencyDays} suffix="días" onChange={v => setParams(p => ({...p, latencyDays: v}))} />
-                                    </div>
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Modalidad Transferencia</label>
-                                        <select 
-                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500"
-                                            value={params.feeMode} 
-                                            onChange={e => setParams(p => ({...p, feeMode: e.target.value}))}
-                                        >
-                                            <option value="OUR">OUR (Remitente paga todo)</option>
-                                            <option value="SHA">SHA (Compartido)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </Card>
+                        // Chequeo Liquidez Estricto
+                        if ((t.week + latW) > p.week) {
+                            hasLiquidityIssue = true;
+                            globalError = true;
+                        }
 
-                            {/* Tarifario */}
-                            <Card className="overflow-hidden">
-                                <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center gap-2 font-semibold text-slate-700">
-                                    <span className="text-blue-500">$</span> Tarifario Bancario
+                        // Cálculo Oportunidad
+                        const timeLost = Math.max(0, p.week - t.week) + latW;
+                        attributedOpp += take * weeklyRate * timeLost;
+
+                        remainingFund -= take;
+                        p.amount -= take;
+                        if(p.amount < 0.01) purchaseQueue.shift();
+                    }
+
+                    grandTotalFees += totalDirect;
+                    grandTotalOpp += attributedOpp;
+
+                    return {
+                        ...t,
+                        breakdown: { bbva, itf, swift, corr },
+                        directCost: totalDirect,
+                        oppCost: attributedOpp,
+                        totalCost: totalDirect + attributedOpp,
+                        error: hasLiquidityIssue
+                    };
+                });
+
+                return {
+                    rows: detailedTransfers,
+                    fees: grandTotalFees,
+                    opp: grandTotalOpp,
+                    total: grandTotalFees + grandTotalOpp,
+                    error: globalError
+                };
+
+            }, [transfers, purchases, portfolio.tir, strategy]);
+
+
+            // --- VISTA: CHART OPTIMIZACIÓN ---
+            const OptimChart = () => {
+                const canvasRef = useRef(null);
+                const chartInst = useRef(null);
+
+                useEffect(() => {
+                    if(!canvasRef.current || purchases.length === 0) return;
+                    
+                    // Generar datos 1..15
+                    const dataPoints = [];
+                    const maxW = purchases[purchases.length-1].week;
+                    
+                    for(let k=1; k<=15; k++){
+                        // 1. Simular Transfers
+                        const cuts = []; for(let i=0; i<k; i++) cuts.push(Math.round(i * maxW / k));
+                        let tList = [];
+                        cuts.forEach((start, idx) => {
+                            const end = (idx===k-1)?99999:cuts[idx+1];
+                            const s = purchases.filter(p=>p.week>=start && p.week<end).reduce((a,b)=>a+b.amount,0);
+                            if(s>0) tList.push({week:start, amount:s});
+                        });
+                        // Ajuste flotante simple
+                        const sT = tList.reduce((a,b)=>a+b.amount,0);
+                        if(tList.length>0 && fundingNeeded>sT) tList[tList.length-1].amount += (fundingNeeded-sT);
+
+                        // 2. Simular Costos
+                        let f=0, o=0;
+                        const wkRate = (portfolio.tir/100)/52;
+                        const lat = strategy.latencyDays/7;
+                        let pQ = JSON.parse(JSON.stringify(purchases));
+                        
+                        tList.forEach(t => {
+                            f += calcBBVA(t.amount) + strategy.swiftFee + (strategy.feeMode==='OUR'?strategy.corrFee:0) + calcITF(t.amount, strategy.useITF);
+                            let rem = t.amount;
+                            while(rem>0.01 && pQ.length>0){
+                                const p=pQ[0]; const take=Math.min(p.amount, rem);
+                                const time = Math.max(0, p.week - t.week) + lat;
+                                o += take * wkRate * time;
+                                rem-=take; p.amount-=take; if(p.amount<0.01) pQ.shift();
+                            }
+                        });
+                        dataPoints.push({ k, fees: f, opp: o, total: f+o });
+                    }
+                    
+                    const minVal = Math.min(...dataPoints.map(d=>d.total));
+                    const bestK = dataPoints.find(d=>d.total===minVal)?.k;
+
+                    const ctx = canvasRef.current.getContext('2d');
+                    if(chartInst.current) chartInst.current.destroy();
+                    
+                    chartInst.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dataPoints.map(d=>d.k),
+                            datasets: [
+                                { label: 'Total', data: dataPoints.map(d=>d.total), borderColor: '#0f172a', borderWidth: 3, pointBackgroundColor: dataPoints.map(d=>d.k===bestK?'#22c55e':'#0f172a'), pointRadius: dataPoints.map(d=>d.k===bestK?6:3) },
+                                { label: 'Oportunidad', data: dataPoints.map(d=>d.opp), borderColor: '#f59e0b', borderDash: [5,5], borderWidth: 2, pointRadius: 0 },
+                                { label: 'Comisiones', data: dataPoints.map(d=>d.fees), borderColor: '#ef4444', borderDash: [5,5], borderWidth: 2, pointRadius: 0 }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { position:'bottom' }, tooltip: { callbacks: { title: (c)=>`K = ${c[0].label} Envíos` } } },
+                            scales: { y: { ticks: { callback: v=>'$'+v } }, x: { grid: {display:false} } }
+                        }
+                    });
+
+                }, [purchases, strategy, portfolio.tir]);
+
+                return <div className="h-64 w-full"><canvas ref={canvasRef} /></div>;
+            };
+
+            // --- EXPORT CSV ---
+            const downloadCSV = () => {
+                if(!simulation) return;
+                let csv = "Tipo,ID,Semana,Monto,Detalle Costos\n";
+                // Compras
+                purchases.forEach(p => csv += `Compra,${p.id},${p.week},"${p.amount.toFixed(2)}",-\n`);
+                // Transferencias
+                simulation.rows.forEach((t, i) => {
+                    csv += `Transferencia,${i+1},${t.week},"${t.amount.toFixed(2)}","Fees: ${t.directCost.toFixed(2)} | Opp: ${t.oppCost.toFixed(2)}"\n`;
+                });
+                
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", "optitransfer_calendario.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            // --- RENDERIZADO TABS ---
+
+            // TAB 1: PRODUCTO
+            const renderProduct = () => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 fade-in">
+                    <Card title="Estado de Cartera" icon="briefcase">
+                        <div className="space-y-4">
+                            <InputField label="Valor Objetivo (Meta)" value={portfolio.targetValue} onChange={v=>setPortfolio({...portfolio, targetValue:v})} suffix="$" />
+                            <InputField label="Valor Actual Cartera" value={portfolio.currentValue} onChange={v=>setPortfolio({...portfolio, currentValue:v})} suffix="$" />
+                            <div className="pt-4 border-t border-slate-100 mt-2">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-sm font-bold text-slate-700">Capital Necesario (Funding)</span>
+                                    <span className="text-xl font-mono font-bold text-blue-600">{fmtUSD(fundingNeeded)}</span>
                                 </div>
-                                <div className="p-5 space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <InputGroup label="Swift" value={params.swiftFee} suffix="$" onChange={v => setParams(p => ({...p, swiftFee: v}))} />
-                                        <InputGroup label="Corresponsal" value={params.correspondentFee} suffix="$" onChange={v => setParams(p => ({...p, correspondentFee: v}))} />
-                                    </div>
-                                    
-                                    <div className="space-y-3 pt-2">
-                                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100">
-                                            <span className="text-xs font-medium text-slate-600">ITF (0.005%)</span>
-                                            <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={params.useITF} onChange={e => setParams(p => ({...p, useITF: e.target.checked}))} />
-                                        </div>
-                                        <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-medium text-slate-600">Imp. Renta (5%)</span>
-                                                <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={params.useIR} onChange={e => setParams(p => ({...p, useIR: e.target.checked}))} />
-                                            </div>
-                                            {params.useIR && (
-                                                <InputGroup label="Ganancia Acumulada" value={params.totalGainForIR} suffix="$" onChange={v => setParams(p => ({...p, totalGainForIR: v}))} />
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                        </div>
-
-                        {/* COL 2: GENERADOR Y TABLAS (Center) */}
-                        <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
-                            
-                            <Card>
-                                <div className="p-5 bg-slate-50/50">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><Icons.Table /> Generador de Escenarios</h3>
-                                        <button onClick={() => { generatePurchases(); }} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
-                                            Regenerar
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-3 gap-3 mb-4">
-                                        <InputGroup label="% Inicial" value={genParams.pctInit} suffix="%" onChange={v => setGenParams(p => ({...p, pctInit: v}))} />
-                                        <InputGroup label="% DCA" value={genParams.pctDCA} suffix="%" onChange={v => setGenParams(p => ({...p, pctDCA: v}))} />
-                                        <InputGroup label="% Reserva" value={genParams.pctRes} suffix="%" onChange={v => setGenParams(p => ({...p, pctRes: v}))} />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <InputGroup label="Semanas DCA" value={genParams.weeksDCA} onChange={v => setGenParams(p => ({...p, weeksDCA: v}))} />
-                                        <InputGroup label="Semana Reserva" value={genParams.weekRes} onChange={v => setGenParams(p => ({...p, weekRes: v}))} />
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <div className="grid grid-cols-2 gap-4 h-[420px]">
-                                {/* Tabla Compras */}
-                                <Card className="flex flex-col overflow-hidden">
-                                    <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase flex justify-between">
-                                        <span>Calendario Compras</span>
-                                        <span className="text-slate-700">{purchases.length} eventos</span>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto">
-                                        <table className="w-full text-xs">
-                                            <thead className="bg-white sticky top-0 text-slate-400">
-                                                <tr><th className="p-2 text-left font-normal">Sem</th><th className="p-2 text-right font-normal">Monto</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50">
-                                                {purchases.map(p => (
-                                                    <tr key={p.id}>
-                                                        <td className="p-2 text-slate-600 font-medium">Sem {p.week}</td>
-                                                        <td className="p-2 text-right font-mono text-slate-800">{fmtNum(p.amount)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </Card>
-
-                                {/* Tabla Transferencias */}
-                                <Card className="flex flex-col overflow-hidden border-blue-200 shadow-md">
-                                    <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 text-xs font-bold text-blue-700 uppercase flex justify-between items-center">
-                                        <span>Calendario Envíos</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-blue-400">K=</span>
-                                            <input 
-                                                type="number" 
-                                                className="w-10 text-center bg-white border border-blue-200 rounded px-1 py-0.5 text-blue-800 font-bold focus:outline-none"
-                                                value={genParams.kTransfers}
-                                                onChange={e => setGenParams(p => ({...p, kTransfers: parseInt(e.target.value) || 1}))}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto bg-blue-50/10">
-                                        <table className="w-full text-xs">
-                                            <thead className="bg-white sticky top-0 text-blue-300">
-                                                <tr><th className="p-2 text-left font-normal">Sem</th><th className="p-2 text-right font-normal">Monto</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-blue-50">
-                                                {transfers.map(t => (
-                                                    <tr key={t.id}>
-                                                        <td className="p-2 text-blue-900 font-medium">Sem {t.week}</td>
-                                                        <td className="p-2 text-right font-mono text-blue-700 font-bold">{fmtNum(t.amount)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="p-2 bg-blue-50 text-[10px] text-center text-blue-400 font-medium">
-                                        Se generan {transfers.length} envíos automáticamente
-                                    </div>
-                                </Card>
+                                <p className="text-xs text-slate-400">Diferencia a cubrir mediante transferencias.</p>
                             </div>
                         </div>
+                    </Card>
+                    <Card title="Rentabilidad Esperada" icon="chart">
+                        <div className="space-y-4">
+                            <InputField label="TIR Anual Estimada (%)" value={portfolio.tir} step="0.01" onChange={v=>setPortfolio({...portfolio, tir:v})} suffix="%" help="Usada para calcular el costo de oportunidad del dinero ocioso." />
+                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mt-2">
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-slate-500">Tasa Semanal</span>
+                                    <span className="font-mono">{(portfolio.tir / 52).toFixed(4)}%</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Costo Espera ($10k / sem)</span>
+                                    <span className="font-mono text-amber-600">~{fmtUSD(10000 * (portfolio.tir/100)/52)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            );
 
-                        {/* COL 3: RESULTADOS (Right) */}
-                        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+            // TAB 2: ESTRATEGIA
+            const renderStrategy = () => (
+                <div className="grid grid-cols-12 gap-6 fade-in">
+                    {/* Generador (Left) */}
+                    <div className="col-span-12 md:col-span-7 space-y-6">
+                        <Card title="Generador de Escenarios (Compras)" icon="settings">
+                            <div className="space-y-5">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <InputField label="% Inicial" value={strategy.pctInit} suffix="%" onChange={v=>setStrategy({...strategy, pctInit:v})} />
+                                    <InputField label="% DCA" value={strategy.pctDCA} suffix="%" onChange={v=>setStrategy({...strategy, pctDCA:v})} />
+                                    <InputField label="% Reserva" value={strategy.pctRes} suffix="%" onChange={v=>setStrategy({...strategy, pctRes:v})} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <InputField label="Semanas DCA" value={strategy.weeksDCA} onChange={v=>setStrategy({...strategy, weeksDCA:v})} />
+                                    <InputField label="Semana Reserva" value={strategy.weekRes} onChange={v=>setStrategy({...strategy, weekRes:v})} />
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                                    <ExplanationBox title="¿Qué es DCA?">
+                                        Dollar Cost Averaging: Dividir la inversión en compras periódicas (ej. semanales) para reducir el riesgo de volatilidad.
+                                    </ExplanationBox>
+                                    <ExplanationBox title="Reserva (Dip)">
+                                        Capital que guardas para "comprar la caída" (buy the dip) o para oportunidades futuras (asignado a la última semana).
+                                    </ExplanationBox>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <Card title="Calendario Resultante" className="max-h-[400px] flex flex-col">
+                            <div className="flex-1 overflow-y-auto">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-slate-50 sticky top-0 text-slate-500 font-semibold border-b">
+                                        <tr><th className="p-3">Evento</th><th className="p-3">Semana</th><th className="p-3 text-right">Monto</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {purchases.map((p, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50">
+                                                <td className="p-3 capitalize">{p.id.split('-')[0]}</td>
+                                                <td className="p-3">Semana {p.week}</td>
+                                                <td className="p-3 text-right font-mono">{fmtNum(p.amount)}</td>
+                                            </tr>
+                                        ))}
+                                        {purchases.length === 0 && <tr><td colSpan="3" className="p-4 text-center text-slate-400">Define el monto en "Producto" primero.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* Parámetros Banco (Right) */}
+                    <div className="col-span-12 md:col-span-5 space-y-6">
+                        <Card title="Parámetros Bancarios" icon="briefcase">
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <InputField label="Swift ($)" value={strategy.swiftFee} suffix="$" onChange={v=>setStrategy({...strategy, swiftFee:v})} />
+                                    <InputField label="Corresponsal ($)" value={strategy.corrFee} suffix="$" onChange={v=>setStrategy({...strategy, corrFee:v})} />
+                                </div>
+                                
+                                <InputField label="Latencia (Días)" value={strategy.latencyDays} suffix="d" onChange={v=>setStrategy({...strategy, latencyDays:v})} />
+                                <ExplanationBox title="Latencia">
+                                    Tiempo que el dinero "desaparece" entre que sale de tu banco y llega al destino. Durante estos días, pierdes rentabilidad (costo de oportunidad) y no tienes liquidez.
+                                </ExplanationBox>
+
+                                <div className="pt-4 border-t">
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Modalidad</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={()=>setStrategy({...strategy, feeMode:'OUR'})} className={`flex-1 py-2 text-xs rounded border ${strategy.feeMode==='OUR'?'bg-blue-50 border-blue-500 text-blue-700 font-bold':'border-slate-200 text-slate-600'}`}>OUR</button>
+                                        <button onClick={()=>setStrategy({...strategy, feeMode:'SHA'})} className={`flex-1 py-2 text-xs rounded border ${strategy.feeMode==='SHA'?'bg-blue-50 border-blue-500 text-blue-700 font-bold':'border-slate-200 text-slate-600'}`}>SHA</button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 pt-2">
+                                    <input type="checkbox" checked={strategy.useITF} onChange={e=>setStrategy({...strategy, useITF:e.target.checked})} />
+                                    <span className="text-xs text-slate-700">Aplicar ITF (0.005%)</span>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                </div>
+            );
+
+            // TAB 3: ANÁLISIS
+            const renderAnalysis = () => {
+                if(!simulation) return <div className="text-center p-10 text-slate-400">Configura el producto y estrategia primero.</div>;
+
+                return (
+                    <div className="grid grid-cols-12 gap-6 fade-in">
+                        
+                        {/* Control y Gráfica (Left/Top) */}
+                        <div className="col-span-12 lg:col-span-4 space-y-6">
+                            <Card title="Variables de Decisión">
+                                <InputField label="Número de Envíos (K)" value={analysisK} step="1" onChange={v=>setAnalysisK(Math.max(1, parseInt(v)||1))} help="Divide el calendario en K partes iguales." />
+                                
+                                <div className="mt-6 space-y-3">
+                                    <div className="flex justify-between items-center p-3 bg-slate-800 text-white rounded-lg shadow-lg">
+                                        <span className="text-sm font-bold">COSTO TOTAL</span>
+                                        <span className="text-xl font-mono font-bold">{fmtUSD(simulation.total)}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="p-2 bg-red-50 border border-red-100 rounded text-center">
+                                            <div className="text-[10px] text-red-500 font-bold uppercase">Comisiones (Cash)</div>
+                                            <div className="text-lg font-mono text-red-700">{fmtUSD(simulation.fees)}</div>
+                                        </div>
+                                        <div className="p-2 bg-amber-50 border border-amber-100 rounded text-center">
+                                            <div className="text-[10px] text-amber-500 font-bold uppercase">Oportunidad (Hidden)</div>
+                                            <div className="text-lg font-mono text-amber-700">{fmtUSD(simulation.opp)}</div>
+                                        </div>
+                                    </div>
+                                    {simulation.error && (
+                                        <div className="p-3 bg-red-100 border border-red-200 text-red-700 rounded text-xs font-bold flex items-center gap-2">
+                                            <Icon name="alert" size={16} /> 
+                                            ¡Error de Liquidez! Dinero llega tarde.
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
                             
-                            {/* Desglose Detallado */}
-                            <Card className="p-5">
-                                <h3 className="font-bold text-slate-800 mb-4 flex justify-between items-center">
-                                    Análisis de Costos
-                                    {results.liquidityError && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded border border-red-200 uppercase tracking-wide">Error Liquidez</span>}
-                                </h3>
+                            <Card title="Curva de Optimización">
+                                <OptimChart />
+                                <p className="text-[10px] text-center text-slate-400 mt-2">La curva busca el balance entre pagar muchas comisiones (K alto) vs perder intereses por espera (K bajo).</p>
+                            </Card>
+                        </div>
 
-                                <div className="space-y-4">
-                                    {/* Bloque 1: Fees */}
-                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                                        <BreakdownRow label="Costos Bancarios (Fees)" value={results.fees} bold color="text-slate-800" />
-                                        <div className="mt-1 border-t border-slate-200/50 pt-1 space-y-0.5">
-                                            <BreakdownRow label="Comisiones BBVA (Var)" value={results.details.bbva} sub />
-                                            <BreakdownRow label="Swift (Fijo)" value={results.details.swift} sub />
-                                            <BreakdownRow label="Corresponsal (OUR)" value={results.details.corr} sub />
-                                        </div>
-                                    </div>
-
-                                    {/* Bloque 2: Impuestos */}
-                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                                        <BreakdownRow label="Impuestos" value={results.taxes} bold color="text-slate-800" />
-                                        <div className="mt-1 border-t border-slate-200/50 pt-1 space-y-0.5">
-                                            <BreakdownRow label="ITF (0.005%)" value={results.details.itf} sub />
-                                            <BreakdownRow label="Imp. Renta (5% Ganancia)" value={results.details.ir} sub />
-                                        </div>
-                                    </div>
-
-                                    {/* Bloque 3: Oportunidad */}
-                                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                                        <BreakdownRow label="Costo de Oportunidad" value={results.opportunityCost} bold color="text-amber-800" />
-                                        <p className="text-[10px] text-amber-600/80 mt-1 pl-1">
-                                            *Interés perdido mientras el dinero espera a ser usado o viaja (latencia).
-                                        </p>
-                                    </div>
-
-                                    {/* Total */}
-                                    <div className="pt-2 border-t border-slate-200">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Costo Final</span>
-                                            <span className="text-2xl font-mono font-bold text-slate-900">{fmtCurrency(results.totalCost)}</span>
-                                        </div>
-                                        <div className="text-right text-xs text-slate-400 mt-1">
-                                            {((results.totalCost / params.totalAmount) * 100).toFixed(2)}% del capital
-                                        </div>
-                                    </div>
+                        {/* Tabla Detallada (Right/Bottom) */}
+                        <div className="col-span-12 lg:col-span-8">
+                            <Card title="Desglose Detallado por Transferencia" className="h-full flex flex-col">
+                                <div className="flex justify-end mb-2">
+                                    <button onClick={downloadCSV} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-bold px-3 py-1 border border-blue-200 rounded hover:bg-blue-50 transition">
+                                        <Icon name="download" size={14} /> Exportar CSV
+                                    </button>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs text-right border-collapse">
+                                        <thead className="bg-slate-50 text-slate-500 border-b">
+                                            <tr>
+                                                <th className="p-3 text-left">#</th>
+                                                <th className="p-3 text-left">Semana</th>
+                                                <th className="p-3">Monto Envío</th>
+                                                <th className="p-3 text-slate-400 font-normal">BBVA</th>
+                                                <th className="p-3 text-slate-400 font-normal">Fijos (Swift/Corr)</th>
+                                                <th className="p-3 text-slate-400 font-normal">ITF</th>
+                                                <th className="p-3 font-bold text-red-600 bg-red-50/50">Total Fees</th>
+                                                <th className="p-3 font-bold text-amber-600 bg-amber-50/50">Oportunidad</th>
+                                                <th className="p-3 font-bold text-slate-900 bg-slate-100">Costo Real</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {simulation.rows.map((row, idx) => (
+                                                <tr key={idx} className={row.error ? 'bg-red-50' : 'hover:bg-slate-50'}>
+                                                    <td className="p-3 text-left font-bold">{idx+1}</td>
+                                                    <td className="p-3 text-left">Sem {row.week}</td>
+                                                    <td className="p-3 font-mono font-bold">{fmtNum(row.amount)}</td>
+                                                    
+                                                    <td className="p-3 text-slate-500">{fmtNum(row.breakdown.bbva)}</td>
+                                                    <td className="p-3 text-slate-500">{fmtNum(row.breakdown.swift + row.breakdown.corr)}</td>
+                                                    <td className="p-3 text-slate-500">{fmtNum(row.breakdown.itf)}</td>
+                                                    
+                                                    <td className="p-3 font-bold text-red-600 bg-red-50/30">{fmtNum(row.directCost)}</td>
+                                                    <td className="p-3 font-bold text-amber-600 bg-amber-50/30">{fmtNum(row.oppCost)}</td>
+                                                    <td className="p-3 font-bold text-slate-900 bg-slate-50">{fmtNum(row.totalCost)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-200">
+                                            <tr>
+                                                <td colSpan="3" className="p-3 text-left">TOTALES</td>
+                                                <td colSpan="3"></td>
+                                                <td className="p-3 text-red-700">{fmtNum(simulation.fees)}</td>
+                                                <td className="p-3 text-amber-700">{fmtNum(simulation.opp)}</td>
+                                                <td className="p-3 text-slate-900">{fmtNum(simulation.total)}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                <div className="mt-4 text-[10px] text-slate-400 leading-normal">
+                                    <p><strong>Nota:</strong> "Oportunidad" en esta tabla es el interés perdido atribuido a este envío específico, calculado desde que el dinero sale (Semana {simulation.rows[0]?.week}) hasta que se gasta efectivamente en una compra, incluyendo {strategy.latencyDays} días de latencia.</p>
                                 </div>
                             </Card>
-
-                            {/* Gráfica */}
-                            <Card className="h-[320px] flex flex-col p-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-bold text-sm text-slate-700"><Icons.Chart /> Curva de Optimización</h3>
-                                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
-                                        Óptimo Sugerido: K={bestK}
-                                    </span>
-                                </div>
-                                <div className="flex-1 relative">
-                                    <ChartComponent data={optimizationData} bestK={bestK} />
-                                </div>
-                            </Card>
-
                         </div>
                     </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen pb-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+                    <header className="mb-8">
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                            <span className="bg-blue-600 text-white p-1.5 rounded-lg"><Icon name="chart" size={20} color="white" /></span>
+                            OptiTransfer Pro <span className="text-slate-400 font-normal text-sm ml-2">v3.0</span>
+                        </h1>
+                    </header>
+
+                    {/* Navigation */}
+                    <nav className="flex gap-6 border-b border-slate-200 mb-6">
+                        <button onClick={()=>setActiveTab('product')} className={`pb-3 px-1 text-sm transition-all ${activeTab==='product' ? 'tab-active' : 'tab-inactive'}`}>1. Producto & Cartera</button>
+                        <button onClick={()=>setActiveTab('strategy')} className={`pb-3 px-1 text-sm transition-all ${activeTab==='strategy' ? 'tab-active' : 'tab-inactive'}`}>2. Estrategia & Generador</button>
+                        <button onClick={()=>setActiveTab('analysis')} className={`pb-3 px-1 text-sm transition-all ${activeTab==='analysis' ? 'tab-active' : 'tab-inactive'}`}>3. Análisis & Costos</button>
+                    </nav>
+
+                    {/* Content */}
+                    <main>
+                        {activeTab === 'product' && renderProduct()}
+                        {activeTab === 'strategy' && renderStrategy()}
+                        {activeTab === 'analysis' && renderAnalysis()}
+                    </main>
                 </div>
             );
         }
